@@ -6,11 +6,11 @@ SHELL = cmd.exe
 
 # Add inputs and outputs from these tool invocations to the build variables 
 CMD_SRCS += \
-../tm4c129encpdt.cmd 
+..//tm4c129encpdt.cmd 
 
 C_SRCS += \
-../main.c \
-../tm4c129encpdt_startup_ccs.c 
+..//main.c \
+..//tm4c129encpdt_startup_ccs.c 
 
 C_DEPS += \
 ./main.d \
@@ -29,7 +29,7 @@ C_DEPS__QUOTED += \
 "tm4c129encpdt_startup_ccs.d" 
 
 C_SRCS__QUOTED += \
-"../main.c" \
-"../tm4c129encpdt_startup_ccs.c" 
+"..//main.c" \
+"..//tm4c129encpdt_startup_ccs.c" 
 
 

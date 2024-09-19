@@ -26,16 +26,6 @@
 	</natures>
 	<linkedResources>
 		<link>
-			<name>drivers/CF128x128x16_ST7735S.c</name>
-			<type>1</type>
-			<locationURI>PARENT-3-PROJECT_LOC/Downloads/CF128x128x16_ST7735S.c</locationURI>
-		</link>
-		<link>
-			<name>drivers/CF128x128x16_ST7735S.h</name>
-			<type>1</type>
-			<locationURI>PARENT-3-PROJECT_LOC/Downloads/CF128x128x16_ST7735S.h</locationURI>
-		</link>
-		<link>
 			<name>drivers/buttons.c</name>
 			<type>1</type>
 			<location>C:/ti/TivaWare_C_Series-2.2.0.295/examples/boards/ek-tm4c129exl/drivers/buttons.c</location>
@@ -44,11 +34,6 @@
 			<name>drivers/pinout.c</name>
 			<type>1</type>
 			<location>C:/ti/TivaWare_C_Series-2.2.0.295/examples/boards/ek-tm4c129exl/drivers/pinout.c</location>
-		</link>
-		<link>
-			<name>drivers/uartstdio.c</name>
-			<type>1</type>
-			<locationURI>PARENT-5-PROJECT_LOC/ti/TivaWare_C_Series-2.2.0.295/utils/uartstdio.c</locationURI>
 		</link>
 	</linkedResources>
 </projectDescription>

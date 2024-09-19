@@ -11,8 +11,11 @@
 #include "utils/uartstdio.h"
 #include "inc/tm4c129encpdt.h"
 
+#include <math.h>
 #include "driverlib/rom.h"
 #include "driverlib/rom_map.h"
+
+#include <stdlib.h>
 
 float pwm_word;
 uint32_t systemClock;
@@ -50,41 +53,43 @@ void UARTIntHandler(void)
     // Loop while there are characters in the receive FIFO.
     while (MAP_UARTCharsAvail(UART0_BASE))
     {
-        // The next character from the UART and save as a char
-        unsigned char c = MAP_UARTCharGetNonBlocking(UART0_BASE);
+        enum
+        {
+            arrSize = 10
+        };
+        char buf[arrSize];
+        UARTgets(buf, arrSize);
 
-        // Write the saved char back to the UART.
-        MAP_UARTCharPutNonBlocking(UART0_BASE, c);
+        int desiredBrightness = atoi(buf);
 
-        if (c == '1')
+        if (desiredBrightness == 100)
         {
             // We want to set the pin to the highest possible value
             PWMPulseWidthSet(PWM0_BASE, PWM_OUT_2, pwm_word / 1); // Strongest = pwm_word/1 | Weakest = pwm_word/10000
             PWMOutputState(PWM0_BASE, PWM_OUT_2_BIT, true);
 
         }
-        else if (c == '0')
+        else if (desiredBrightness == 0)
         {
             // We want to turn off the lamp
-            PWMPulseWidthSet(PWM0_BASE, PWM_OUT_2, pwm_word / 10000); // Strongest = pwm_word/1 | Weakest = pwm_word/10000
+            PWMPulseWidthSet(PWM0_BASE, PWM_OUT_2, pwm_word / 10000);
             PWMOutputState(PWM0_BASE, PWM_OUT_2_BIT, false);
 
         }
-    }
-}
+        else
+        {
+            // Since the brightness seems to be logarithmic base 2, we want to find the inverse so that we can scale it to become roughly linear from 0 to 100.
+            // We found that the brightness seemed to be lowest around pwm_word * (1 / 10'000).
+            // We then want to find x in 2^((desiredBrightness-100)/x) = 1 / 10'000, when desiredBrightness = 0 and x is some scaling factor.
+            double scalingFactor = 7.5;
+            float exponent = ((float) desiredBrightness - 100.0)
+                    / scalingFactor;
 
-//*****************************************************************************
-//
-// Send a string to the UART.
-//
-//*****************************************************************************
-void UARTSend(const uint8_t *pui8Buffer, uint32_t ui32Count)
-{
-    // Loop while there are more characters to send.
-    while (ui32Count--)
-    {
-        // Write the next character to the UART.
-        MAP_UARTCharPutNonBlocking(UART0_BASE, *pui8Buffer++);
+            // The brightness should be somewhere between min and max brightness.
+            float width = pwm_word * pow(2, exponent); // Strongest = pwm_word/1 | Weakest = pwm_word/10000
+            PWMPulseWidthSet(PWM0_BASE, PWM_OUT_2, width);
+            PWMOutputState(PWM0_BASE, PWM_OUT_2_BIT, true);
+        }
     }
 }
 
@@ -134,8 +139,7 @@ int main(void)
 
     PWMOutputState(PWM0_BASE, PWM_OUT_2_BIT, true);
 
-    // Prompt for text to be entered.
-    UARTSend((uint8_t*) "\033[2JEnter text: ", 16);
+    UARTprintf("\033[2JEnter text: ");
 
     while (1)
     {

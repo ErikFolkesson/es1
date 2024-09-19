@@ -17,6 +17,8 @@
 
 #include <stdlib.h>
 
+#include "driverlib/adc.h"
+
 float pwm_word;
 uint32_t systemClock;
 
@@ -93,6 +95,24 @@ void UARTIntHandler(void)
     }
 }
 
+void joystickSetup()
+{
+    SysCtlPeripheralEnable(SYSCTL_PERIPH_ADC0);
+
+    while (!SysCtlPeripheralReady(SYSCTL_PERIPH_ADC0))
+    {
+    }
+
+    SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOE);
+
+    while (!SysCtlPeripheralReady(SYSCTL_PERIPH_GPIOE))
+    {
+    }
+
+    GPIOPinTypeADC(GPIO_PORTE_BASE, GPIO_PIN_4);
+    GPIOPinConfigure(GPIO_PE4_U1RI); // OBS! Might be wrong pinConfig value.
+}
+
 //*****************************************************************************
 //
 //                      Main
@@ -143,5 +163,6 @@ int main(void)
 
     while (1)
     {
+        // joystick();
     }
 }

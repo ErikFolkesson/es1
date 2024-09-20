@@ -147,9 +147,9 @@ void joystick()
 
     ADCSequenceDataGet(ADC0_BASE, SEQ_NUM, &buffer); // 0 lowest | 1450-1950 middle | 4000 higher
 
-    desiredBrightness = buffer / 40;
+    int desiredBrightness = buffer / 40;
 
-    setBrightness(buffer);
+    setBrightness(desiredBrightness);
 }
 
 //*****************************************************************************

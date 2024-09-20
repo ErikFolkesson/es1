@@ -37,16 +37,18 @@ void ConfigureUART(void)
     UARTStdioConfig(0, 115200, 16000000);
 }
 
-void setBrigthness(int desiredBrightness)
+// desiredBrightness should be integer in range 0 - 100, if the value is outside the range it will be clamped.
+// Sets the brightness of the red LED.
+void setBrightness(int desiredBrightness)
 {
-    if (desiredBrightness == 100)
+    if (desiredBrightness >= 100)
     {
         // We want to set the pin to the highest possible value
         PWMPulseWidthSet(PWM0_BASE, PWM_OUT_2, pwm_word / 1); // Strongest = pwm_word/1 | Weakest = pwm_word/10000
         PWMOutputState(PWM0_BASE, PWM_OUT_2_BIT, true);
 
     }
-    else if (desiredBrightness == 0)
+    else if (desiredBrightness <= 0)
     {
         // We want to turn off the lamp
         PWMPulseWidthSet(PWM0_BASE, PWM_OUT_2, pwm_word / 10000);
@@ -93,9 +95,10 @@ void UARTIntHandler(void)
         char buf[arrSize];
         UARTgets(buf, arrSize);
 
+        // All non integer values becomes 0.
         int desiredBrightness = atoi(buf);
 
-        setBrigthness(desiredBrightness);
+        setBrightness(desiredBrightness);
 
     }
 }
@@ -104,25 +107,29 @@ void UARTIntHandler(void)
 
 void joystickSetup()
 {
+    // Enable he ADC peripheral port
     SysCtlPeripheralEnable(SYSCTL_PERIPH_ADC0);
 
     while (!SysCtlPeripheralReady(SYSCTL_PERIPH_ADC0))
     {
     }
 
+    // Enable the GPIO port that is associated with the peripheral (joystick)
     SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOE);
 
     while (!SysCtlPeripheralReady(SYSCTL_PERIPH_GPIOE))
     {
     }
 
+    // Sets pin 4 as ADC pin
     GPIOPinTypeADC(GPIO_PORTE_BASE, GPIO_PIN_4);
-    GPIOPinConfigure(GPIO_PE4_U1RI); // OBS! Might be wrong pinConfig value.
+    GPIOPinConfigure(GPIO_PE4_U1RI);
 
-    ADCSequenceConfigure(ADC0_BASE, SEQ_NUM, ADC_TRIGGER_PROCESSOR, 0); //ADC_TRIGGER_EXTERNAL
-    ADCSequenceStepConfigure(ADC0_BASE, SEQ_NUM, 0, ADC_CTL_END | ADC_CTL_IE); // 0 might be wrong, other step can be 1 or 2 or 3
-
-    // Can add channel if we need to
+    // ADC_TRIGGER_PROCESSOR is used to allows us to trigger the reading of the joystick
+    // SEQ_NUM = 3 because we only care about one value when reading the ADC pin.
+    // Highest priority
+    ADCSequenceConfigure(ADC0_BASE, SEQ_NUM, ADC_TRIGGER_PROCESSOR, 0);
+    ADCSequenceStepConfigure(ADC0_BASE, SEQ_NUM, 0, ADC_CTL_END | ADC_CTL_IE);
 
     ADCSequenceEnable(ADC0_BASE, SEQ_NUM);
 }
@@ -131,8 +138,7 @@ void joystick()
 {
     ADCProcessorTrigger(ADC0_BASE, SEQ_NUM);
 
-    // ADCIntStatus(ADC0_BASE, SEQ_NUM, true);
-
+    // Wait until the interrupt is handled
     while (ADC_INT_SS0 & ADCIntStatus(ADC0_BASE, SEQ_NUM, true))
     {
     }
@@ -141,9 +147,9 @@ void joystick()
 
     ADCSequenceDataGet(ADC0_BASE, SEQ_NUM, &buffer); // 0 lowest | 1450-1950 middle | 4000 higher
 
-    buffer = buffer / 40;
+    desiredBrightness = buffer / 40;
 
-    setBrigthness(buffer);
+    setBrightness(buffer);
 }
 
 //*****************************************************************************

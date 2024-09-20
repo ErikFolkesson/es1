@@ -1,1 +1,0 @@
-"./main.obj" "./tm4c129encpdt_startup_ccs.obj" "./drivers/buttons.obj" "./drivers/pinout.obj" "../tm4c129encpdt.cmd" -llibc.a -l"C:/ti/TivaWare_C_Series-2.2.0.295/driverlib/ccs/Debug/driverlib.lib" 

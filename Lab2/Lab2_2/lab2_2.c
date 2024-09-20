@@ -22,21 +22,6 @@
 float pwm_word;
 uint32_t systemClock;
 
-//***********************************************************************
-//                       Configurations
-//***********************************************************************
-// Configure the UART.
-void ConfigureUART(void)
-{
-    SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOA);
-    SysCtlPeripheralEnable(SYSCTL_PERIPH_UART0);
-    GPIOPinConfigure(GPIO_PA0_U0RX);
-    GPIOPinConfigure(GPIO_PA1_U0TX);
-    GPIOPinTypeUART(GPIO_PORTA_BASE, GPIO_PIN_0 | GPIO_PIN_1);
-    UARTClockSourceSet(UART0_BASE, UART_CLOCK_PIOSC);
-    UARTStdioConfig(0, 115200, 16000000);
-}
-
 // desiredBrightness should be integer in range 0 - 100, if the value is outside the range it will be clamped.
 // Sets the brightness of the red LED.
 void setBrightness(int desiredBrightness)
@@ -67,39 +52,6 @@ void setBrightness(int desiredBrightness)
         float width = pwm_word * pow(2, exponent); // Strongest = pwm_word/1 | Weakest = pwm_word/10000
         PWMPulseWidthSet(PWM0_BASE, PWM_OUT_2, width);
         PWMOutputState(PWM0_BASE, PWM_OUT_2_BIT, true);
-    }
-}
-
-//*****************************************************************************
-//
-// The UART interrupt handler.
-//
-//*****************************************************************************
-void UARTIntHandler(void)
-{
-    uint32_t ui32Status;
-
-    // Get the interrupt status.
-    ui32Status = MAP_UARTIntStatus(UART0_BASE, true);
-
-    // Clear the asserted interrupts.
-    MAP_UARTIntClear(UART0_BASE, ui32Status);
-
-    // Loop while there are characters in the receive FIFO.
-    while (MAP_UARTCharsAvail(UART0_BASE))
-    {
-        enum
-        {
-            arrSize = 10
-        };
-        char buf[arrSize];
-        UARTgets(buf, arrSize);
-
-        // All non integer values becomes 0.
-        int desiredBrightness = atoi(buf);
-
-        setBrightness(desiredBrightness);
-
     }
 }
 
@@ -159,22 +111,10 @@ void joystick()
 //*****************************************************************************
 int main(void)
 {
-    ConfigureUART();
-
     systemClock = SysCtlClockFreqSet(
             (SYSCTL_XTAL_25MHZ | SYSCTL_OSC_MAIN | SYSCTL_USE_PLL
                     | SYSCTL_CFG_VCO_480),
             16000);
-
-    // Enable processor interrupts.
-    MAP_IntMasterEnable();
-
-    // Register the interrupt handler function for UART 0.
-    IntRegister(INT_UART0, UARTIntHandler);
-
-    // Enable the UART interrupt.
-    MAP_IntEnable(INT_UART0);
-    MAP_UARTIntEnable(UART0_BASE, UART_INT_RX | UART_INT_RT);
 
     pwm_word = systemClock / 200;
     SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOF);
@@ -197,8 +137,6 @@ int main(void)
     PWMGenEnable(PWM0_BASE, PWM_GEN_1);
 
     PWMOutputState(PWM0_BASE, PWM_OUT_2_BIT, true);
-
-    UARTprintf("\033[2JEnter text: ");
 
     joystickSetup();
 

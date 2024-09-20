@@ -103,55 +103,6 @@ void UARTIntHandler(void)
     }
 }
 
-#define SEQ_NUM 3
-
-void joystickSetup()
-{
-    // Enable he ADC peripheral port
-    SysCtlPeripheralEnable(SYSCTL_PERIPH_ADC0);
-
-    while (!SysCtlPeripheralReady(SYSCTL_PERIPH_ADC0))
-    {
-    }
-
-    // Enable the GPIO port that is associated with the peripheral (joystick)
-    SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOE);
-
-    while (!SysCtlPeripheralReady(SYSCTL_PERIPH_GPIOE))
-    {
-    }
-
-    // Sets pin 4 as ADC pin
-    GPIOPinTypeADC(GPIO_PORTE_BASE, GPIO_PIN_4);
-    GPIOPinConfigure(GPIO_PE4_U1RI);
-
-    // ADC_TRIGGER_PROCESSOR is used to allows us to trigger the reading of the joystick
-    // SEQ_NUM = 3 because we only care about one value when reading the ADC pin.
-    // Highest priority
-    ADCSequenceConfigure(ADC0_BASE, SEQ_NUM, ADC_TRIGGER_PROCESSOR, 0);
-    ADCSequenceStepConfigure(ADC0_BASE, SEQ_NUM, 0, ADC_CTL_END | ADC_CTL_IE);
-
-    ADCSequenceEnable(ADC0_BASE, SEQ_NUM);
-}
-
-void joystick()
-{
-    ADCProcessorTrigger(ADC0_BASE, SEQ_NUM);
-
-    // Wait until the interrupt is handled
-    while (ADC_INT_SS0 & ADCIntStatus(ADC0_BASE, SEQ_NUM, true))
-    {
-    }
-
-    uint32_t buffer;
-
-    ADCSequenceDataGet(ADC0_BASE, SEQ_NUM, &buffer); // 0 lowest | 1450-1950 middle | 4000 higher
-
-    int desiredBrightness = buffer / 40;
-
-    setBrightness(desiredBrightness);
-}
-
 //*****************************************************************************
 //
 //                      Main
@@ -166,13 +117,13 @@ int main(void)
                     | SYSCTL_CFG_VCO_480),
             16000);
 
-    // Enable processor interrupts.
+// Enable processor interrupts.
     MAP_IntMasterEnable();
 
-    // Register the interrupt handler function for UART 0.
+// Register the interrupt handler function for UART 0.
     IntRegister(INT_UART0, UARTIntHandler);
 
-    // Enable the UART interrupt.
+// Enable the UART interrupt.
     MAP_IntEnable(INT_UART0);
     MAP_UARTIntEnable(UART0_BASE, UART_INT_RX | UART_INT_RT);
 
@@ -200,10 +151,7 @@ int main(void)
 
     UARTprintf("\033[2JEnter text: ");
 
-    joystickSetup();
-
     while (1)
     {
-        joystick();
     }
 }

@@ -130,8 +130,6 @@ int main(void)
     pwm_word = systemClock / 200;
     SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOF);
     SysCtlPWMClockSet(SYSCTL_PWMDIV_1);
-    SysCtlPeripheralDisable(SYSCTL_PERIPH_PWM0);
-    SysCtlPeripheralReset(SYSCTL_PERIPH_PWM0);
     SysCtlPeripheralEnable(SYSCTL_PERIPH_PWM0);
 
     GPIOPinTypePWM(GPIO_PORTF_BASE, GPIO_PIN_2);

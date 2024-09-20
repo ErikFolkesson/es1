@@ -37,6 +37,37 @@ void ConfigureUART(void)
     UARTStdioConfig(0, 115200, 16000000);
 }
 
+void setBrigthness(int desiredBrightness)
+{
+    if (desiredBrightness == 100)
+    {
+        // We want to set the pin to the highest possible value
+        PWMPulseWidthSet(PWM0_BASE, PWM_OUT_2, pwm_word / 1); // Strongest = pwm_word/1 | Weakest = pwm_word/10000
+        PWMOutputState(PWM0_BASE, PWM_OUT_2_BIT, true);
+
+    }
+    else if (desiredBrightness == 0)
+    {
+        // We want to turn off the lamp
+        PWMPulseWidthSet(PWM0_BASE, PWM_OUT_2, pwm_word / 10000);
+        PWMOutputState(PWM0_BASE, PWM_OUT_2_BIT, false);
+
+    }
+    else
+    {
+        // Since the brightness seems to be logarithmic base 2, we want to find the inverse so that we can scale it to become roughly linear from 0 to 100.
+        // We found that the brightness seemed to be lowest around pwm_word * (1 / 10'000).
+        // We then want to find x in 2^((desiredBrightness-100)/x) = 1 / 10'000, when desiredBrightness = 0 and x is some scaling factor.
+        double scalingFactor = 7.5;
+        float exponent = ((float) desiredBrightness - 100.0) / scalingFactor;
+
+        // The brightness should be somewhere between min and max brightness.
+        float width = pwm_word * pow(2, exponent); // Strongest = pwm_word/1 | Weakest = pwm_word/10000
+        PWMPulseWidthSet(PWM0_BASE, PWM_OUT_2, width);
+        PWMOutputState(PWM0_BASE, PWM_OUT_2_BIT, true);
+    }
+}
+
 //*****************************************************************************
 //
 // The UART interrupt handler.
@@ -64,36 +95,12 @@ void UARTIntHandler(void)
 
         int desiredBrightness = atoi(buf);
 
-        if (desiredBrightness == 100)
-        {
-            // We want to set the pin to the highest possible value
-            PWMPulseWidthSet(PWM0_BASE, PWM_OUT_2, pwm_word / 1); // Strongest = pwm_word/1 | Weakest = pwm_word/10000
-            PWMOutputState(PWM0_BASE, PWM_OUT_2_BIT, true);
+        setBrigthness(desiredBrightness);
 
-        }
-        else if (desiredBrightness == 0)
-        {
-            // We want to turn off the lamp
-            PWMPulseWidthSet(PWM0_BASE, PWM_OUT_2, pwm_word / 10000);
-            PWMOutputState(PWM0_BASE, PWM_OUT_2_BIT, false);
-
-        }
-        else
-        {
-            // Since the brightness seems to be logarithmic base 2, we want to find the inverse so that we can scale it to become roughly linear from 0 to 100.
-            // We found that the brightness seemed to be lowest around pwm_word * (1 / 10'000).
-            // We then want to find x in 2^((desiredBrightness-100)/x) = 1 / 10'000, when desiredBrightness = 0 and x is some scaling factor.
-            double scalingFactor = 7.5;
-            float exponent = ((float) desiredBrightness - 100.0)
-                    / scalingFactor;
-
-            // The brightness should be somewhere between min and max brightness.
-            float width = pwm_word * pow(2, exponent); // Strongest = pwm_word/1 | Weakest = pwm_word/10000
-            PWMPulseWidthSet(PWM0_BASE, PWM_OUT_2, width);
-            PWMOutputState(PWM0_BASE, PWM_OUT_2_BIT, true);
-        }
     }
 }
+
+#define SEQ_NUM 3
 
 void joystickSetup()
 {
@@ -111,6 +118,32 @@ void joystickSetup()
 
     GPIOPinTypeADC(GPIO_PORTE_BASE, GPIO_PIN_4);
     GPIOPinConfigure(GPIO_PE4_U1RI); // OBS! Might be wrong pinConfig value.
+
+    ADCSequenceConfigure(ADC0_BASE, SEQ_NUM, ADC_TRIGGER_PROCESSOR, 0); //ADC_TRIGGER_EXTERNAL
+    ADCSequenceStepConfigure(ADC0_BASE, SEQ_NUM, 0, ADC_CTL_END | ADC_CTL_IE); // 0 might be wrong, other step can be 1 or 2 or 3
+
+    // Can add channel if we need to
+
+    ADCSequenceEnable(ADC0_BASE, SEQ_NUM);
+}
+
+void joystick()
+{
+    ADCProcessorTrigger(ADC0_BASE, SEQ_NUM);
+
+    // ADCIntStatus(ADC0_BASE, SEQ_NUM, true);
+
+    while (ADC_INT_SS0 & ADCIntStatus(ADC0_BASE, SEQ_NUM, true))
+    {
+    }
+
+    uint32_t buffer;
+
+    ADCSequenceDataGet(ADC0_BASE, SEQ_NUM, &buffer); // 0 lowest | 1450-1950 middle | 4000 higher
+
+    buffer = buffer / 40;
+
+    setBrigthness(buffer);
 }
 
 //*****************************************************************************
@@ -161,8 +194,10 @@ int main(void)
 
     UARTprintf("\033[2JEnter text: ");
 
+    joystickSetup();
+
     while (1)
     {
-        // joystick();
+        joystick();
     }
 }

@@ -93,6 +93,11 @@ void UARTIntHandler(void)
             arrSize = 10
         };
         char buf[arrSize];
+
+        // If I understand this function correctly, it will read the input until a newline character is found.
+        // Meaning that the while loop we are in will only run once.
+        // This is why we can recivie multiple characters in one go.
+        // `UARTgets` contains it's own loop that reads characters until a newline character is found.
         UARTgets(buf, arrSize);
 
         // All non integer values becomes 0.

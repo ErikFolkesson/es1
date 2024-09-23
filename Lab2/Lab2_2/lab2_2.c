@@ -74,14 +74,16 @@ void joystickSetup()
     }
 
     // Sets pin 4 as ADC pin
-    GPIOPinTypeADC(GPIO_PORTE_BASE, GPIO_PIN_4);
-    GPIOPinConfigure(GPIO_PE4_U1RI);
+    // GPIOPinTypeADC(GPIO_PORTE_BASE, GPIO_PIN_4);
+    // GPIOPinConfigure(GPIO_PE4_U1RI);
+    GPIOPinTypeADC(GPIO_PORTE_BASE, GPIO_PIN_3);
+    GPIOPinConfigure(GPIO_PE3_U1DTR);
 
     // ADC_TRIGGER_PROCESSOR is used to allows us to trigger the reading of the joystick
     // SEQ_NUM = 3 because we only care about one value when reading the ADC pin.
     // Highest priority
     ADCSequenceConfigure(ADC0_BASE, SEQ_NUM, ADC_TRIGGER_PROCESSOR, 0);
-    ADCSequenceStepConfigure(ADC0_BASE, SEQ_NUM, 0, ADC_CTL_END | ADC_CTL_IE);
+    ADCSequenceStepConfigure(ADC0_BASE, SEQ_NUM, 0, ADC_CTL_CH9 | ADC_CTL_END | ADC_CTL_IE);
 
     ADCSequenceEnable(ADC0_BASE, SEQ_NUM);
 }

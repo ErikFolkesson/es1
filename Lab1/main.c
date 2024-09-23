@@ -119,6 +119,6 @@ int main(void)
 {
     // assig1();
     // assig2();
-    // optionalAssigErik();
-    Lab1OptionalJohan();
+    optionalAssigErik();
+    // Lab1OptionalJohan();
 }

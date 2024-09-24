@@ -50,26 +50,54 @@ void ConfigureUART(void)
     UARTStdioConfig(0, 115200, 16000000);
 }
 
+// Makes sure that the PWM peripheral is enabled and that the port and pin for the red LED are configured as using PWM.
+void enablePwm(void)
+{
+    // If PWM is already enabled, we don't need to do anything.
+    if (SysCtlPeripheralReady(LED_PWM_PERIPH))
+    {
+        return;
+    }
+
+    SysCtlPeripheralEnable(LED_PWM_PERIPH);
+    while (!SysCtlPeripheralReady(LED_PWM_PERIPH))
+    {
+    }
+    GPIOPinTypePWM(LED_GPIO_BASE, LED_GPIO_PIN);
+    GPIOPinConfigure(LED_PWM_PIN_CONFIGURATION);
+}
+
+// Makes sure that the GPIO peripheral is enabled and that the port and pin for the red LED are configured as using GPIO output.
+void enableGpio(void)
+{
+    // If PWM is enabled, we need to disable it.
+    if (SysCtlPeripheralReady(LED_PWM_PERIPH))
+    {
+        SysCtlPeripheralDisable(LED_PWM_PERIPH);
+        // FIXME: Do we need to wait for it to be disabled completely?
+    }
+
+    GPIOPinTypeGPIOOutput(LED_GPIO_BASE, LED_GPIO_PIN);
+}
+
 // desiredBrightness should be integer in range 0 - 100, if the value is outside the range it will be clamped.
 // Sets the brightness of the red LED.
 void setBrightness(int desiredBrightness)
 {
     if (desiredBrightness >= 100)
     {
-        // We want to set the pin to the highest possible value
-        PWMPulseWidthSet(PWM_BASE, PWM_OUT, pwm_word / 1); // Strongest = pwm_word/1 | Weakest = pwm_word/10000
-        PWMOutputState(PWM_BASE, PWM_OUT_BIT, true);
-
+        enableGpio();
+        GPIOPinWrite(LED_GPIO_BASE, LED_GPIO_PIN, LED_GPIO_PIN);
     }
     else if (desiredBrightness <= 0)
     {
-        // We want to turn off the lamp
-        PWMPulseWidthSet(PWM_BASE, PWM_OUT, pwm_word / 10000);
-        PWMOutputState(PWM_BASE, PWM_OUT_BIT, false);
-
+        enableGpio();
+        GPIOPinWrite(LED_GPIO_BASE, LED_GPIO_PIN, 0);
     }
     else
     {
+        enablePwm(); // FIXME: Re-enabling the PWM probably keeps the previous pulse width, which might(?) cause flicker if it was very high, but then gets set to very low.
+
         // Since the brightness seems to be logarithmic base 2, we want to find the inverse so that we can scale it to become roughly linear from 0 to 100.
         // We found that the brightness seemed to be lowest around pwm_word * (1 / 10'000).
         // We then want to find x in 2^((desiredBrightness-100)/x) = 1 / 10'000, when desiredBrightness = 0 and x is some scaling factor.

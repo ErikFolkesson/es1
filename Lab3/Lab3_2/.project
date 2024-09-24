@@ -28,7 +28,7 @@
 		<link>
 			<name>drivers/uartstdio.c</name>
 			<type>1</type>
-			<locationURI>PARENT-6-PROJECT_LOC/ti/TivaWare_C_Series-2.2.0.295/utils/uartstdio.c</locationURI>
+			<locationURI>TI_PRODUCTS_DIR/TivaWare_C_Series-2.2.0.295/utils/uartstdio.c</locationURI>
 		</link>
 	</linkedResources>
 </projectDescription>

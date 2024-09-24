@@ -22,6 +22,19 @@
 float pwm_word;
 uint32_t systemClock;
 
+// Constants
+enum
+{
+    LED_GPIO_BASE = GPIO_PORTF_BASE,
+    LED_GPIO_PIN = GPIO_PIN_2,
+    LED_PWM_PERIPH = SYSCTL_PERIPH_PWM0,
+    LED_PWM_BASE = PWM0_BASE,
+    LED_PWM_OUT = PWM_OUT_2,
+    LED_PWM_OUT_BIT = PWM_OUT_2_BIT,
+    LED_PWM_GENERATOR = PWM_GEN_1,
+    LED_PWM_PIN_CONFIGURATION = GPIO_PF2_M0PWM2,
+};
+
 //***********************************************************************
 //                       Configurations
 //***********************************************************************
@@ -44,15 +57,15 @@ void setBrightness(int desiredBrightness)
     if (desiredBrightness >= 100)
     {
         // We want to set the pin to the highest possible value
-        PWMPulseWidthSet(PWM0_BASE, PWM_OUT_2, pwm_word / 1); // Strongest = pwm_word/1 | Weakest = pwm_word/10000
-        PWMOutputState(PWM0_BASE, PWM_OUT_2_BIT, true);
+        PWMPulseWidthSet(PWM_BASE, PWM_OUT, pwm_word / 1); // Strongest = pwm_word/1 | Weakest = pwm_word/10000
+        PWMOutputState(PWM_BASE, PWM_OUT_BIT, true);
 
     }
     else if (desiredBrightness <= 0)
     {
         // We want to turn off the lamp
-        PWMPulseWidthSet(PWM0_BASE, PWM_OUT_2, pwm_word / 10000);
-        PWMOutputState(PWM0_BASE, PWM_OUT_2_BIT, false);
+        PWMPulseWidthSet(PWM_BASE, PWM_OUT, pwm_word / 10000);
+        PWMOutputState(PWM_BASE, PWM_OUT_BIT, false);
 
     }
     else
@@ -65,8 +78,8 @@ void setBrightness(int desiredBrightness)
 
         // The brightness should be somewhere between min and max brightness.
         float width = pwm_word * pow(2, exponent); // Strongest = pwm_word/1 | Weakest = pwm_word/10000
-        PWMPulseWidthSet(PWM0_BASE, PWM_OUT_2, width);
-        PWMOutputState(PWM0_BASE, PWM_OUT_2_BIT, true);
+        PWMPulseWidthSet(LED_PWM_BASE, LED_PWM_OUT, width);
+        PWMOutputState(LED_PWM_BASE, LED_PWM_OUT_BIT, true);
     }
 }
 
@@ -135,22 +148,21 @@ int main(void)
     pwm_word = systemClock / 200;
     SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOF);
     SysCtlPWMClockSet(SYSCTL_PWMDIV_1);
-    SysCtlPeripheralEnable(SYSCTL_PERIPH_PWM0);
+    SysCtlPeripheralEnable(LED_PWM_PERIPH);
 
-    GPIOPinTypePWM(GPIO_PORTF_BASE, GPIO_PIN_2);
-    GPIOPinConfigure(GPIO_PF2_M0PWM2);
+    GPIOPinTypePWM(LED_GPIO_BASE, LED_GPIO_PIN);
+    GPIOPinConfigure(LED_PWM_PIN_CONFIGURATION);
 
-    PWMGenConfigure(
-            PWM0_BASE, PWM_GEN_1,
-            PWM_GEN_MODE_DOWN | PWM_GEN_MODE_NO_SYNC | PWM_GEN_MODE_DBG_RUN);
+    PWMGenConfigure(LED_PWM_BASE, LED_PWM_GENERATOR,
+    PWM_GEN_MODE_DOWN | PWM_GEN_MODE_NO_SYNC | PWM_GEN_MODE_DBG_RUN);
 
-    PWMGenPeriodSet(PWM0_BASE, PWM_GEN_1, pwm_word);
+    PWMGenPeriodSet(LED_PWM_BASE, LED_PWM_GENERATOR, pwm_word);
 
-    PWMPulseWidthSet(PWM0_BASE, PWM_OUT_2, pwm_word / 10000); // Strongest = pwm_word/1 | Weakest = pwm_word/10000
+    PWMPulseWidthSet(LED_PWM_BASE, LED_PWM_OUT, pwm_word / 10000); // Strongest = pwm_word/1 | Weakest = pwm_word/10000
 
-    PWMGenEnable(PWM0_BASE, PWM_GEN_1);
+    PWMGenEnable(LED_PWM_BASE, LED_PWM_GENERATOR);
 
-    PWMOutputState(PWM0_BASE, PWM_OUT_2_BIT, true);
+    PWMOutputState(LED_PWM_BASE, LED_PWM_OUT_BIT, true);
 
     UARTprintf("\033[2JEnter text: ");
 

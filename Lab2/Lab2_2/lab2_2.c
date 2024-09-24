@@ -22,6 +22,21 @@
 float pwm_word;
 uint32_t systemClock;
 
+// Constants
+enum
+{
+    LED_GPIO_BASE = GPIO_PORTF_BASE,
+    LED_GPIO_PIN = GPIO_PIN_2,
+    LED_PWM_PERIPH = SYSCTL_PERIPH_PWM0,
+    LED_PWM_BASE = PWM0_BASE,
+    LED_PWM_OUT = PWM_OUT_2,
+    LED_PWM_OUT_BIT = PWM_OUT_2_BIT,
+    LED_PWM_GENERATOR = PWM_GEN_1,
+    LED_PWM_PIN_CONFIGURATION = GPIO_PF2_M0PWM2,
+    JOY_ADC_SEQ_NUM = 3, // Sequence 3 only reads one value.
+    JOY_ADC_BASE = ADC0_BASE,
+};
+
 // desiredBrightness should be integer in range 0 - 100, if the value is outside the range it will be clamped.
 // Sets the brightness of the red LED.
 void setBrightness(int desiredBrightness)
@@ -29,15 +44,15 @@ void setBrightness(int desiredBrightness)
     if (desiredBrightness >= 100)
     {
         // We want to set the pin to the highest possible value
-        PWMPulseWidthSet(PWM0_BASE, PWM_OUT_2, pwm_word / 1); // Strongest = pwm_word/1 | Weakest = pwm_word/10000
-        PWMOutputState(PWM0_BASE, PWM_OUT_2_BIT, true);
+        PWMPulseWidthSet(LED_PWM_BASE, LED_PWM_OUT, pwm_word / 1); // Strongest = pwm_word/1 | Weakest = pwm_word/10000
+        PWMOutputState(LED_PWM_BASE, LED_PWM_OUT_BIT, true);
 
     }
     else if (desiredBrightness <= 0)
     {
         // We want to turn off the lamp
-        PWMPulseWidthSet(PWM0_BASE, PWM_OUT_2, pwm_word / 10000);
-        PWMOutputState(PWM0_BASE, PWM_OUT_2_BIT, false);
+        PWMPulseWidthSet(LED_PWM_BASE, LED_PWM_OUT, pwm_word / 10000);
+        PWMOutputState(LED_PWM_BASE, LED_PWM_OUT_BIT, false);
 
     }
     else
@@ -50,56 +65,73 @@ void setBrightness(int desiredBrightness)
 
         // The brightness should be somewhere between min and max brightness.
         float width = pwm_word * pow(2, exponent); // Strongest = pwm_word/1 | Weakest = pwm_word/10000
-        PWMPulseWidthSet(PWM0_BASE, PWM_OUT_2, width);
-        PWMOutputState(PWM0_BASE, PWM_OUT_2_BIT, true);
+        PWMPulseWidthSet(LED_PWM_BASE, LED_PWM_OUT, width);
+        PWMOutputState(LED_PWM_BASE, LED_PWM_OUT_BIT, true);
     }
 }
 
-#define SEQ_NUM 3
-
 void joystickSetup()
 {
-    // Enable he ADC peripheral port
-    SysCtlPeripheralEnable(SYSCTL_PERIPH_ADC0);
+    enum
+    {
+        ADC_HOR_JOY_CH = ADC_CTL_CH9, // AIN9 in table 2-1 in the user guide for tm4c129exl.
+        ADC_HIGHEST_PRIO = 0,
+        ADC_PERIPH = SYSCTL_PERIPH_ADC0,
+        ADC_GPIO_PORT_PERIPH = SYSCTL_PERIPH_GPIOE,
+        ADC_GPIO_PORT_BASE = GPIO_PORTE_BASE,
+        ADC_GPIO_PIN = GPIO_PIN_3,
+        ADC_STEP = 0, // For JOY_ADC_SEQ_NUM = 3, the only valid step is step 0.
+        ADC_PIN_CONFIG = GPIO_PE3_U1DTR,
+    };
 
-    while (!SysCtlPeripheralReady(SYSCTL_PERIPH_ADC0))
+    // Enable he ADC peripheral port
+    SysCtlPeripheralEnable(ADC_PERIPH);
+
+    while (!SysCtlPeripheralReady(ADC_PERIPH))
     {
     }
 
     // Enable the GPIO port that is associated with the peripheral (joystick)
-    SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOE);
+    SysCtlPeripheralEnable(ADC_GPIO_PORT_PERIPH);
 
-    while (!SysCtlPeripheralReady(SYSCTL_PERIPH_GPIOE))
+    while (!SysCtlPeripheralReady(ADC_GPIO_PORT_PERIPH))
     {
     }
 
     // Sets pin 4 as ADC pin
     // GPIOPinTypeADC(GPIO_PORTE_BASE, GPIO_PIN_4);
     // GPIOPinConfigure(GPIO_PE4_U1RI);
-    GPIOPinTypeADC(GPIO_PORTE_BASE, GPIO_PIN_3);
-    GPIOPinConfigure(GPIO_PE3_U1DTR);
+    GPIOPinTypeADC(ADC_GPIO_PORT_BASE, ADC_GPIO_PIN);
+    GPIOPinConfigure(ADC_PIN_CONFIG);
 
     // ADC_TRIGGER_PROCESSOR is used to allows us to trigger the reading of the joystick
     // SEQ_NUM = 3 because we only care about one value when reading the ADC pin.
     // Highest priority
-    ADCSequenceConfigure(ADC0_BASE, SEQ_NUM, ADC_TRIGGER_PROCESSOR, 0);
-    ADCSequenceStepConfigure(ADC0_BASE, SEQ_NUM, 0, ADC_CTL_CH9 | ADC_CTL_END | ADC_CTL_IE);
+    ADCSequenceConfigure(JOY_ADC_BASE, JOY_ADC_SEQ_NUM, ADC_TRIGGER_PROCESSOR,
+                         ADC_HIGHEST_PRIO);
+    ADCSequenceStepConfigure(JOY_ADC_BASE, JOY_ADC_SEQ_NUM, ADC_STEP,
+                             ADC_HOR_JOY_CH | ADC_CTL_END | ADC_CTL_IE);
 
-    ADCSequenceEnable(ADC0_BASE, SEQ_NUM);
+    ADCSequenceEnable(JOY_ADC_BASE, JOY_ADC_SEQ_NUM);
 }
 
 void joystick()
 {
-    ADCProcessorTrigger(ADC0_BASE, SEQ_NUM);
+    enum
+    {
+        ADC_READ_VALUE_INTERRUPT = ADC_INT_SS0,
+    };
+    ADCProcessorTrigger(JOY_ADC_BASE, JOY_ADC_SEQ_NUM);
 
     // Wait until the interrupt is handled
-    while (ADC_INT_SS0 & ADCIntStatus(ADC0_BASE, SEQ_NUM, true))
+    while (ADC_READ_VALUE_INTERRUPT
+            & ADCIntStatus(JOY_ADC_BASE, JOY_ADC_SEQ_NUM, true))
     {
     }
 
     uint32_t buffer;
 
-    ADCSequenceDataGet(ADC0_BASE, SEQ_NUM, &buffer); // 0 lowest | 1450-1950 middle | 4000 higher
+    ADCSequenceDataGet(JOY_ADC_BASE, JOY_ADC_SEQ_NUM, &buffer); // 0 lowest | 1450-1950 middle | 4000 higher
 
     int desiredBrightness = buffer / 40;
 
@@ -125,22 +157,21 @@ int main(void)
     // These can be removed. Maybe because it could be enabled from the beginning?
     // SysCtlPeripheralDisable(SYSCTL_PERIPH_PWM0);
     // SysCtlPeripheralReset(SYSCTL_PERIPH_PWM0);
-    SysCtlPeripheralEnable(SYSCTL_PERIPH_PWM0);
+    SysCtlPeripheralEnable(LED_PWM_PERIPH);
 
-    GPIOPinTypePWM(GPIO_PORTF_BASE, GPIO_PIN_2);
-    GPIOPinConfigure(GPIO_PF2_M0PWM2);
+    GPIOPinTypePWM(LED_GPIO_BASE, LED_GPIO_PIN);
+    GPIOPinConfigure(LED_PWM_PIN_CONFIGURATION);
 
-    PWMGenConfigure(
-            PWM0_BASE, PWM_GEN_1,
-            PWM_GEN_MODE_DOWN | PWM_GEN_MODE_NO_SYNC | PWM_GEN_MODE_DBG_RUN);
+    PWMGenConfigure(LED_PWM_BASE, LED_PWM_GENERATOR,
+    PWM_GEN_MODE_DOWN | PWM_GEN_MODE_NO_SYNC | PWM_GEN_MODE_DBG_RUN);
 
-    PWMGenPeriodSet(PWM0_BASE, PWM_GEN_1, pwm_word);
+    PWMGenPeriodSet(LED_PWM_BASE, LED_PWM_GENERATOR, pwm_word);
 
-    PWMPulseWidthSet(PWM0_BASE, PWM_OUT_2, pwm_word / 10000); // Strongest = pwm_word/1 | Weakest = pwm_word/10000
+    PWMPulseWidthSet(LED_PWM_BASE, LED_PWM_OUT, pwm_word / 10000); // Strongest = pwm_word/1 | Weakest = pwm_word/10000
 
-    PWMGenEnable(PWM0_BASE, PWM_GEN_1);
+    PWMGenEnable(LED_PWM_BASE, LED_PWM_GENERATOR);
 
-    PWMOutputState(PWM0_BASE, PWM_OUT_2_BIT, true);
+    PWMOutputState(LED_PWM_BASE, LED_PWM_OUT_BIT, true);
 
     joystickSetup();
 

@@ -116,7 +116,8 @@ void joystickSetup()
     ADCSequenceEnable(JOY_ADC_BASE, JOY_ADC_SEQ_NUM);
 }
 
-void joystick()
+// Reads the current value of the joystick. The value will be in about in the range [0, 4000].
+uint32_t readJoystick()
 {
     enum
     {
@@ -135,7 +136,14 @@ void joystick()
     int32_t samplesRead = ADCSequenceDataGet(JOY_ADC_BASE, JOY_ADC_SEQ_NUM, &buffer); // 0 lowest | 1450-1950 middle | 4000 higher
     assert(samplesRead == 1);
 
-    int desiredBrightness = buffer / 40;
+    return buffer;
+}
+
+void joystick()
+{
+
+    uint32_t joystickValue = readJoystick();
+    int desiredBrightness = joystickValue / 40;
 
     setBrightness(desiredBrightness);
 }

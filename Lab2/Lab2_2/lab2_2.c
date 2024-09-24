@@ -1,6 +1,7 @@
 //*****************************************************************************
 #include <stdbool.h>
 #include <stdint.h>
+#include <assert.h>
 #include "inc/hw_memmap.h"
 #include "driverlib/gpio.h"
 #include "driverlib/interrupt.h"
@@ -131,7 +132,8 @@ void joystick()
 
     uint32_t buffer;
 
-    ADCSequenceDataGet(JOY_ADC_BASE, JOY_ADC_SEQ_NUM, &buffer); // 0 lowest | 1450-1950 middle | 4000 higher
+    int32_t samplesRead = ADCSequenceDataGet(JOY_ADC_BASE, JOY_ADC_SEQ_NUM, &buffer); // 0 lowest | 1450-1950 middle | 4000 higher
+    assert(samplesRead == 1);
 
     int desiredBrightness = buffer / 40;
 

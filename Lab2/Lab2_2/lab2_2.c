@@ -82,7 +82,6 @@ void joystickSetup()
         ADC_GPIO_PORT_BASE = GPIO_PORTE_BASE,
         ADC_GPIO_PIN = GPIO_PIN_3,
         ADC_STEP = 0, // For JOY_ADC_SEQ_NUM = 3, the only valid step is step 0.
-        ADC_PIN_CONFIG = GPIO_PE3_U1DTR,
     };
 
     // Enable he ADC peripheral port
@@ -99,11 +98,7 @@ void joystickSetup()
     {
     }
 
-    // Sets pin 4 as ADC pin
-    // GPIOPinTypeADC(GPIO_PORTE_BASE, GPIO_PIN_4);
-    // GPIOPinConfigure(GPIO_PE4_U1RI);
     GPIOPinTypeADC(ADC_GPIO_PORT_BASE, ADC_GPIO_PIN);
-    GPIOPinConfigure(ADC_PIN_CONFIG);
 
     // ADC_TRIGGER_PROCESSOR is used to allows us to trigger the reading of the joystick
     // SEQ_NUM = 3 because we only care about one value when reading the ADC pin.

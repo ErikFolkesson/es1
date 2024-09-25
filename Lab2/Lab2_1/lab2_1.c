@@ -29,9 +29,9 @@ enum
     LED_GPIO_PIN = GPIO_PIN_2,
     LED_PWM_PERIPH = SYSCTL_PERIPH_PWM0,
     LED_PWM_BASE = PWM0_BASE,
-    LED_PWM_OUT = PWM_OUT_2,
+    LED_PWM_OUT = PWM_OUT_2, // The pin for the LED uses PWM output 2.
     LED_PWM_OUT_BIT = PWM_OUT_2_BIT,
-    LED_PWM_GENERATOR = PWM_GEN_1,
+    LED_PWM_GENERATOR = PWM_GEN_1, // PWM output 2 is associated with generator 1.
     LED_PWM_PIN_CONFIGURATION = GPIO_PF2_M0PWM2,
 };
 
@@ -163,13 +163,13 @@ int main(void)
                     | SYSCTL_CFG_VCO_480),
             16000);
 
-// Enable processor interrupts.
+    // Enable processor interrupts.
     MAP_IntMasterEnable();
 
-// Register the interrupt handler function for UART 0.
+    // Register the interrupt handler function for UART 0.
     IntRegister(INT_UART0, UARTIntHandler);
 
-// Enable the UART interrupt.
+    // Enable the UART interrupt. RX = Receive, RT = Receive timeout.
     MAP_IntEnable(INT_UART0);
     MAP_UARTIntEnable(UART0_BASE, UART_INT_RX | UART_INT_RT);
 
@@ -181,6 +181,9 @@ int main(void)
     GPIOPinTypePWM(LED_GPIO_BASE, LED_GPIO_PIN);
     GPIOPinConfigure(LED_PWM_PIN_CONFIGURATION);
 
+    // PWM_GEN_MODE_DOWN: counts from some value down to 0 and then resets, "producing left-aligned PWM signals".
+    // PWM_GEN_MODE_NO_SYNC: Any changes to period or pulse width will be applied immediately the next time the counter becomes 0 instead of waiting for a synchronization event.
+    // PWM_GEN_MODE_DBG_RUN: Don't pause the PWM while the process is stopped in the debugger.
     PWMGenConfigure(LED_PWM_BASE, LED_PWM_GENERATOR,
     PWM_GEN_MODE_DOWN | PWM_GEN_MODE_NO_SYNC | PWM_GEN_MODE_DBG_RUN);
 

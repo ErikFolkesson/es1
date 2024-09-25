@@ -30,11 +30,11 @@ enum
     LED_GPIO_PIN = GPIO_PIN_2,
     LED_PWM_PERIPH = SYSCTL_PERIPH_PWM0,
     LED_PWM_BASE = PWM0_BASE,
-    LED_PWM_OUT = PWM_OUT_2,
+    LED_PWM_OUT = PWM_OUT_2, // The pin for the LED uses PWM output 2.
     LED_PWM_OUT_BIT = PWM_OUT_2_BIT,
-    LED_PWM_GENERATOR = PWM_GEN_1,
+    LED_PWM_GENERATOR = PWM_GEN_1, // PWM output 2 is associated with generator 1.
     LED_PWM_PIN_CONFIGURATION = GPIO_PF2_M0PWM2,
-    JOY_ADC_SEQ_NUM = 3, // Sequence 3 only reads one value.
+    JOY_ADC_SEQ_NUM = 3, // Sequence 3 only samples one value.
     JOY_ADC_BASE = ADC0_BASE,
 };
 
@@ -71,11 +71,12 @@ void setBrightness(int desiredBrightness)
     }
 }
 
+// Initializes the necessary ports/pins and sets up an ADC sequencer (JOY_ADC_SEQ_NUM) ready for sampling.
 void joystickSetup()
 {
     enum
     {
-        ADC_HOR_JOY_CH = ADC_CTL_CH9, // AIN9 in table 2-1 in the user guide for tm4c129exl.
+        ADC_HOR_JOY_CH = ADC_CTL_CH9, // The pin for horizontal movement (PE4) is connected to channel 9 (AIN9).
         ADC_HIGHEST_PRIO = 0,
         ADC_PERIPH = SYSCTL_PERIPH_ADC0,
         ADC_GPIO_PORT_PERIPH = SYSCTL_PERIPH_GPIOE,
@@ -84,7 +85,7 @@ void joystickSetup()
         ADC_STEP = 0, // For JOY_ADC_SEQ_NUM = 3, the only valid step is step 0.
     };
 
-    // Enable he ADC peripheral port
+    // Enable the ADC peripheral port
     SysCtlPeripheralEnable(ADC_PERIPH);
 
     while (!SysCtlPeripheralReady(ADC_PERIPH))
@@ -100,11 +101,12 @@ void joystickSetup()
 
     GPIOPinTypeADC(ADC_GPIO_PORT_BASE, ADC_GPIO_PIN);
 
-    // ADC_TRIGGER_PROCESSOR is used to allows us to trigger the reading of the joystick
-    // SEQ_NUM = 3 because we only care about one value when reading the ADC pin.
-    // Highest priority
+    // ADC_TRIGGER_PROCESSOR is used to allows us to trigger the reading of the joystick using the ADCProcessorTrigger function.
     ADCSequenceConfigure(JOY_ADC_BASE, JOY_ADC_SEQ_NUM, ADC_TRIGGER_PROCESSOR,
                          ADC_HIGHEST_PRIO);
+
+    // ADC_CTL_END: This step is the last in the sequence.
+    // ADC_CTL_IE: When this step is complete, it will cause an interrupt.
     ADCSequenceStepConfigure(JOY_ADC_BASE, JOY_ADC_SEQ_NUM, ADC_STEP,
                              ADC_HOR_JOY_CH | ADC_CTL_END | ADC_CTL_IE);
 
@@ -118,9 +120,10 @@ uint32_t readJoystick()
     {
         ADC_READ_VALUE_INTERRUPT = ADC_INT_SS3, // SS3 = sample sequence 3.
     };
+
     ADCProcessorTrigger(JOY_ADC_BASE, JOY_ADC_SEQ_NUM);
 
-    // Wait until the interrupt is handled
+    // Wait until the interrupt sampling the joystick value has completed.
     while (ADC_READ_VALUE_INTERRUPT
             & ADCIntStatus(JOY_ADC_BASE, JOY_ADC_SEQ_NUM, true))
     {
@@ -128,7 +131,8 @@ uint32_t readJoystick()
 
     uint32_t buffer;
 
-    int32_t samplesRead = ADCSequenceDataGet(JOY_ADC_BASE, JOY_ADC_SEQ_NUM, &buffer); // 0 lowest | 1450-1950 middle | 4000 higher
+    int32_t samplesRead = ADCSequenceDataGet(JOY_ADC_BASE, JOY_ADC_SEQ_NUM,
+                                             &buffer); // 0 lowest | 1450-1950 middle | 4000 higher
     assert(samplesRead == 1);
 
     return buffer;
@@ -139,6 +143,7 @@ void setBrightnessFromJoystick()
 {
 
     uint32_t joystickValue = readJoystick();
+    // We divide by 40 since we want to generate a value between [0,100], and the maximum value that readJoystick can return is around 4000.
     int desiredBrightness = joystickValue / 40;
 
     setBrightness(desiredBrightness);
@@ -160,14 +165,14 @@ int main(void)
     SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOF);
     SysCtlPWMClockSet(SYSCTL_PWMDIV_1);
 
-    // These can be removed. Maybe because it could be enabled from the beginning?
-    // SysCtlPeripheralDisable(SYSCTL_PERIPH_PWM0);
-    // SysCtlPeripheralReset(SYSCTL_PERIPH_PWM0);
     SysCtlPeripheralEnable(LED_PWM_PERIPH);
 
     GPIOPinTypePWM(LED_GPIO_BASE, LED_GPIO_PIN);
     GPIOPinConfigure(LED_PWM_PIN_CONFIGURATION);
 
+    // PWM_GEN_MODE_DOWN: counts from some value down to 0 and then resets, "producing left-aligned PWM signals".
+    // PWM_GEN_MODE_NO_SYNC: Any changes to period or pulse width will be applied immediately the next time the counter becomes 0 instead of waiting for a synchronization event.
+    // PWM_GEN_MODE_DBG_RUN: Don't pause the PWM while the process is stopped in the debugger.
     PWMGenConfigure(LED_PWM_BASE, LED_PWM_GENERATOR,
     PWM_GEN_MODE_DOWN | PWM_GEN_MODE_NO_SYNC | PWM_GEN_MODE_DBG_RUN);
 

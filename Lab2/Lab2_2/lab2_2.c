@@ -116,7 +116,7 @@ uint32_t readJoystick()
 {
     enum
     {
-        ADC_READ_VALUE_INTERRUPT = ADC_INT_SS0,
+        ADC_READ_VALUE_INTERRUPT = ADC_INT_SS3, // SS3 = sample sequence 3.
     };
     ADCProcessorTrigger(JOY_ADC_BASE, JOY_ADC_SEQ_NUM);
 

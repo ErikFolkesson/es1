@@ -134,7 +134,8 @@ uint32_t readJoystick()
     return buffer;
 }
 
-void joystick()
+// Reads the current value of the joystick and sets the brightness based on the value.
+void setBrightnessFromJoystick()
 {
 
     uint32_t joystickValue = readJoystick();
@@ -182,6 +183,6 @@ int main(void)
 
     while (1)
     {
-        joystick();
+        setBrightnessFromJoystick();
     }
 }

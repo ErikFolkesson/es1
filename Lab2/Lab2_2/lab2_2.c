@@ -80,7 +80,7 @@ void joystickSetup()
         ADC_PERIPH = SYSCTL_PERIPH_ADC0,
         ADC_GPIO_PORT_PERIPH = SYSCTL_PERIPH_GPIOE,
         ADC_GPIO_PORT_BASE = GPIO_PORTE_BASE,
-        ADC_GPIO_PIN = GPIO_PIN_3,
+        ADC_GPIO_PIN = GPIO_PIN_4,
         ADC_STEP = 0, // For JOY_ADC_SEQ_NUM = 3, the only valid step is step 0.
     };
 

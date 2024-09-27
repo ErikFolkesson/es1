@@ -12,27 +12,20 @@
 #include "inc/tm4c129encpdt.h"
 
 #include <math.h>
+#include <ctype.h>
+#include <assert.h>
+#include <string.h>
+#include <ctype.h>
 #include "driverlib/rom.h"
 #include "driverlib/rom_map.h"
 
 #include "driverlib/adc.h"
+#include "driverlib/timer.h"
 
-float pwm_word;
-uint32_t systemClock;
-
-//***********************************************************************
-//                       Configurations
-//***********************************************************************
-// Configure the UART.
-void ConfigureUART(void)
+uint8_t charToInt(char c)
 {
-    SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOA);
-    SysCtlPeripheralEnable(SYSCTL_PERIPH_UART0);
-    GPIOPinConfigure(GPIO_PA0_U0RX);
-    GPIOPinConfigure(GPIO_PA1_U0TX);
-    GPIOPinTypeUART(GPIO_PORTA_BASE, GPIO_PIN_0 | GPIO_PIN_1);
-    UARTClockSourceSet(UART0_BASE, UART_CLOCK_PIOSC);
-    UARTStdioConfig(0, 115200, 16000000);
+    assert(isdigit(c));
+    return c - '0';
 }
 
 //*****************************************************************************
@@ -42,6 +35,7 @@ void ConfigureUART(void)
 //*****************************************************************************
 void UARTIntHandler(void)
 {
+    // FIXME: Maybe move functionality to uart.c function instead.
     uint32_t ui32Status;
 
     // Get the interrupt status.
@@ -50,45 +44,72 @@ void UARTIntHandler(void)
     // Clear the asserted interrupts.
     MAP_UARTIntClear(UART0_BASE, ui32Status);
 
-    // Loop while there are characters in the receive FIFO.
+    enum
+    {
+        ENTER = '\r', ESC = 0x1B,
+    };
+
     while (MAP_UARTCharsAvail(UART0_BASE))
     {
-        enum
+        int32_t c = uartGetChar();
+        if (c == ENTER)
         {
-            arrSize = 20
-        };
-        char buf[arrSize];
-        UARTgets(buf, arrSize);
-        UARTprintf("%s\n", buf);
-    }
-}
+            const char* userInputBuf = uartGetInputBuf();
+            if (strcmp("start", userInputBuf) == 0)
+            {
+                startTimer();
+            }
+            else if (strcmp("stop", userInputBuf) == 0)
+            {
+                stopTimer();
+            }
+            else if (strcmp("reset", userInputBuf) == 0)
+            {
+                resetTimer();
+            }
+            else
+            {
+                size_t size = strlen(userInputBuf);
+                if (size == 8)
+                {
+                    bool colonsAreCorrect = userInputBuf[2] == ':'
+                            && userInputBuf[5] == ':';
+#define ARRSIZE(arr) (sizeof(arr) / sizeof(*arr))
+                    int numberPositions[] = { 0, 1, 3, 4, 6, 7 };
 
-void UARTIntHandler2(void)
-{
-    uint32_t ui32Status;
+                    bool numbersAreCorrect = true;
+                    int i;
+                    for (i = 0; i < ARRSIZE(numberPositions); i++)
+                    {
+                        if (!isdigit(userInputBuf[numberPositions[i]]))
+                        {
+                            numbersAreCorrect = false;
+                            break;
+                        }
+                    }
 
-    //
-    // Get the interrrupt status.
-    //
-    ui32Status = MAP_UARTIntStatus(UART0_BASE, true);
+                    if (colonsAreCorrect && numbersAreCorrect)
+                    {
+                        uint8_t hours = charToInt(userInputBuf[0]) * 10
+                                + charToInt(userInputBuf[1]);
+                        uint8_t minutes = charToInt(userInputBuf[3]) * 10
+                                + charToInt(userInputBuf[4]);
+                        uint8_t seconds = charToInt(userInputBuf[6]) * 10
+                                + charToInt(userInputBuf[7]);
 
-    //
-    // Clear the asserted interrupts.
-    //
-    MAP_UARTIntClear(UART0_BASE, ui32Status);
+                        setTimer(hours, minutes, seconds);
+                    }
+                }
+            }
 
-    //
-    // Loop while there are characters in the receive FIFO.
-    //
-    while (MAP_UARTCharsAvail(UART0_BASE))
-    {
-        //
-        // Read the next character from the UART and write it back to the UART.
-        //
-        MAP_UARTCharPutNonBlocking(UART0_BASE,
-                                   MAP_UARTCharGetNonBlocking(UART0_BASE));
+            eraseLineAndReturnCarriage();
 
-        // MAP_UARTCharGetNonBlocking(UART0_BASE);
+
+        }
+        else if (c == '\b')
+        {
+            uartEraseChar();
+        }
     }
 }
 
@@ -101,24 +122,12 @@ int main(void)
 {
     ConfigureUART();
 
-    systemClock = SysCtlClockFreqSet(
-            (SYSCTL_XTAL_25MHZ | SYSCTL_OSC_MAIN | SYSCTL_USE_PLL
-                    | SYSCTL_CFG_VCO_480),
-            16000);
+    setupTimer();
 
-    // Enable processor interrupts.
-    MAP_IntMasterEnable();
-
-    // Register the interrupt handler function for UART 0.
-    IntRegister(INT_UART0, UARTIntHandler);
-
-    // Enable the UART interrupt.
-    MAP_IntEnable(INT_UART0);
-    MAP_UARTIntEnable(UART0_BASE, UART_INT_RX | UART_INT_RT);
-
-    UARTprintf("\033[2JEnter text: ");
+    UARTprintf("\x1B[2J\x1B[2;1HEnter command below:\x1B[1E");
 
     while (1)
     {
+
     }
 }

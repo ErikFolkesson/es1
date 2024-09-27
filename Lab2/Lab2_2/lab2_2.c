@@ -62,7 +62,6 @@ void enableGpio(void)
     if (SysCtlPeripheralReady(LED_PWM_PERIPH))
     {
         SysCtlPeripheralDisable(LED_PWM_PERIPH);
-        // FIXME: Do we need to wait for it to be disabled completely?
     }
 
     GPIOPinTypeGPIOOutput(LED_GPIO_BASE, LED_GPIO_PIN);

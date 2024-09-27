@@ -74,7 +74,6 @@ void enableGpio(void)
     if (SysCtlPeripheralReady(LED_PWM_PERIPH))
     {
         SysCtlPeripheralDisable(LED_PWM_PERIPH);
-        // FIXME: Do we need to wait for it to be disabled completely?
     }
 
     GPIOPinTypeGPIOOutput(LED_GPIO_BASE, LED_GPIO_PIN);
@@ -96,7 +95,7 @@ void setBrightness(int desiredBrightness)
     }
     else
     {
-        enablePwm(); // FIXME: Re-enabling the PWM probably keeps the previous pulse width, which might(?) cause flicker if it was very high, but then gets set to very low.
+        enablePwm();
 
         // Since the brightness seems to be logarithmic base 2, we want to find the inverse so that we can scale it to become roughly linear from 0 to 100.
         // We found that the brightness seemed to be lowest around pwm_word * (1 / 10'000).

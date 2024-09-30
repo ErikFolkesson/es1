@@ -22,6 +22,8 @@
 #include "driverlib/adc.h"
 #include "driverlib/timer.h"
 
+#define ARRSIZE(arr) (sizeof(arr) / sizeof(*arr))
+
 uint8_t charToInt(char c)
 {
     assert(isdigit(c));
@@ -74,9 +76,8 @@ void UARTIntHandler(void)
                 {
                     bool colonsAreCorrect = userInputBuf[2] == ':'
                             && userInputBuf[5] == ':';
-#define ARRSIZE(arr) (sizeof(arr) / sizeof(*arr))
-                    int numberPositions[] = { 0, 1, 3, 4, 6, 7 };
 
+                    int numberPositions[] = { 0, 1, 3, 4, 6, 7 };
                     bool numbersAreCorrect = true;
                     int i;
                     for (i = 0; i < ARRSIZE(numberPositions); i++)

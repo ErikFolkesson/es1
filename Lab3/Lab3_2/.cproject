@@ -48,7 +48,6 @@
 									<listOptionValue builtIn="false" value="C:\ti\TivaWare_C_Series-2.2.0.295\utils"/>
 									<listOptionValue builtIn="false" value="C:\ti\TivaWare_C_Series-2.2.0.295\examples\boards\ek-tm4c129exl"/>
 									<listOptionValue builtIn="false" value="C:\ti\TivaWare_C_Series-2.2.0.295"/>
-									<listOptionValue builtIn="false" value="${PROJECT_LOC}/../../../Downloads"/>
 									<listOptionValue builtIn="false" value="${CG_TOOL_ROOT}/include"/>
 								</option>
 								<option id="com.ti.ccstudio.buildDefinitions.TMS470_20.2.compilerID.DEBUGGING_MODEL.1657418794" name="Debugging model" superClass="com.ti.ccstudio.buildDefinitions.TMS470_20.2.compilerID.DEBUGGING_MODEL" value="com.ti.ccstudio.buildDefinitions.TMS470_20.2.compilerID.DEBUGGING_MODEL.SYMDEBUG__DWARF" valueType="enumerated"/>

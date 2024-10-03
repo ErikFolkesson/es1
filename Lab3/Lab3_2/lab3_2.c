@@ -47,28 +47,28 @@ bool isStopCommand(const char *input)
 bool isClockCommand(const char *input)
 {
     size_t size = strlen(input);
-    if (size == 8)
+    if (size != 8)
     {
-        bool colonsAreCorrect = input[2] == ':' && input[5] == ':';
+        return false;
+    }
 
-        int numberPositions[] = { 0, 1, 3, 4, 6, 7 };
-        bool numbersAreCorrect = true;
-        int i;
-        for (i = 0; i < ARRSIZE(numberPositions); i++)
-        {
-            if (!isdigit(input[numberPositions[i]]))
-            {
-                numbersAreCorrect = false;
-                break;
-            }
-        }
+    bool colonsAreCorrect = input[2] == ':' && input[5] == ':';
+    if (!colonsAreCorrect)
+    {
+        return false;
+    }
 
-        if (colonsAreCorrect && numbersAreCorrect)
+    int numberPositions[] = { 0, 1, 3, 4, 6, 7 };
+    int i;
+    for (i = 0; i < ARRSIZE(numberPositions); i++)
+    {
+        if (!isdigit(input[numberPositions[i]]))
         {
-            return true;
+            return false;
         }
     }
-    return false;
+
+    return true;
 }
 
 //*****************************************************************************

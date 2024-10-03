@@ -67,6 +67,7 @@ void setupTimer(void)
 void startTimer(void)
 {
     TimerEnable(TIMER_BASE, TIMER_A);
+    printClock(g_counter);
 }
 
 void stopTimer(void)

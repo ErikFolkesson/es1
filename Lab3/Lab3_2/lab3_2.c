@@ -1,7 +1,14 @@
-//*****************************************************************************
+#include "uartio.h"
+#include "timer.h"
+
 #include <stdbool.h>
 #include <stdint.h>
-#include "inc/hw_memmap.h"
+#include <math.h>
+#include <ctype.h>
+#include <assert.h>
+#include <string.h>
+#include <ctype.h>
+
 #include "driverlib/gpio.h"
 #include "driverlib/interrupt.h"
 #include "driverlib/pin_map.h"
@@ -9,18 +16,11 @@
 #include "driverlib/sysctl.h"
 #include "driverlib/uart.h"
 #include "utils/uartstdio.h"
-#include "inc/tm4c129encpdt.h"
-
-#include <math.h>
-#include <ctype.h>
-#include <assert.h>
-#include <string.h>
-#include <ctype.h>
 #include "driverlib/rom.h"
 #include "driverlib/rom_map.h"
-
-#include "driverlib/adc.h"
 #include "driverlib/timer.h"
+#include "inc/hw_memmap.h"
+#include "inc/tm4c129encpdt.h"
 
 #define ARRSIZE(arr) (sizeof(arr) / sizeof(*arr))
 

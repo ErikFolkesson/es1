@@ -5,23 +5,16 @@
 #include <stdbool.h>
 #include <assert.h>
 
-#include <driverlib/timer.h>
-#include "inc/hw_memmap.h"
-#include "inc/tm4c129encpdt.h"
+#include "driverlib/timer.h"
 #include "driverlib/sysctl.h"
-
-
 #include "driverlib/pin_map.h"
 #include "driverlib/sysctl.h"
-
 #include "driverlib/interrupt.h"
 #include "driverlib/rom_map.h"
-
-#include "inc/tm4c129encpdt.h"
 #include "driverlib/uart.h"
-
-
-
+#include "inc/tm4c129encpdt.h"
+#include "inc/hw_memmap.h"
+#include "inc/tm4c129encpdt.h"
 
 // FIXME: comments.
 uint32_t g_counter_reset_value = 0;

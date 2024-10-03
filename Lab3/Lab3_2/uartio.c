@@ -9,18 +9,12 @@
 
 #include "driverlib/pin_map.h"
 #include "driverlib/sysctl.h"
-
 #include "driverlib/interrupt.h"
 #include "driverlib/rom_map.h"
-
-#include "inc/tm4c129encpdt.h"
 #include "driverlib/uart.h"
-
-
-
-#include "inc/hw_memmap.h"
-
 #include "driverlib/gpio.h"
+#include "inc/tm4c129encpdt.h"
+#include "inc/hw_memmap.h"
 
 extern void UARTIntHandler(void); // Declare the handler in lab3_2.c.
 

@@ -29,6 +29,48 @@ uint8_t charToInt(char c)
     return c - '0';
 }
 
+bool isStartCommand(const char *input)
+{
+    return strcmp("start", input) == 0;
+}
+
+bool isResetCommand(const char *input)
+{
+    return strcmp("reset", input) == 0;
+}
+
+bool isStopCommand(const char *input)
+{
+    return strcmp("stop", input) == 0;
+}
+
+bool isClockCommand(const char *input)
+{
+    size_t size = strlen(input);
+    if (size == 8)
+    {
+        bool colonsAreCorrect = input[2] == ':' && input[5] == ':';
+
+        int numberPositions[] = { 0, 1, 3, 4, 6, 7 };
+        bool numbersAreCorrect = true;
+        int i;
+        for (i = 0; i < ARRSIZE(numberPositions); i++)
+        {
+            if (!isdigit(input[numberPositions[i]]))
+            {
+                numbersAreCorrect = false;
+                break;
+            }
+        }
+
+        if (colonsAreCorrect && numbersAreCorrect)
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
 //*****************************************************************************
 //
 // The UART interrupt handler.
@@ -56,50 +98,28 @@ void UARTIntHandler(void)
         if (c == ENTER)
         {
             const char *userInputBuf = uartGetInputBuf();
-            if (strcmp("start", userInputBuf) == 0)
+            if (isStartCommand(userInputBuf))
             {
                 startTimer();
             }
-            else if (strcmp("stop", userInputBuf) == 0)
+            else if (isStopCommand(userInputBuf))
             {
                 stopTimer();
             }
-            else if (strcmp("reset", userInputBuf) == 0)
+            else if (isResetCommand(userInputBuf))
             {
                 resetTimer();
             }
-            else
+            else if (isClockCommand(userInputBuf))
             {
-                size_t size = strlen(userInputBuf);
-                if (size == 8)
-                {
-                    bool colonsAreCorrect = userInputBuf[2] == ':'
-                            && userInputBuf[5] == ':';
+                uint8_t hours = charToInt(userInputBuf[0]) * 10
+                        + charToInt(userInputBuf[1]);
+                uint8_t minutes = charToInt(userInputBuf[3]) * 10
+                        + charToInt(userInputBuf[4]);
+                uint8_t seconds = charToInt(userInputBuf[6]) * 10
+                        + charToInt(userInputBuf[7]);
 
-                    int numberPositions[] = { 0, 1, 3, 4, 6, 7 };
-                    bool numbersAreCorrect = true;
-                    int i;
-                    for (i = 0; i < ARRSIZE(numberPositions); i++)
-                    {
-                        if (!isdigit(userInputBuf[numberPositions[i]]))
-                        {
-                            numbersAreCorrect = false;
-                            break;
-                        }
-                    }
-
-                    if (colonsAreCorrect && numbersAreCorrect)
-                    {
-                        uint8_t hours = charToInt(userInputBuf[0]) * 10
-                                + charToInt(userInputBuf[1]);
-                        uint8_t minutes = charToInt(userInputBuf[3]) * 10
-                                + charToInt(userInputBuf[4]);
-                        uint8_t seconds = charToInt(userInputBuf[6]) * 10
-                                + charToInt(userInputBuf[7]);
-
-                        setTimer(hours, minutes, seconds);
-                    }
-                }
+                setTimer(hours, minutes, seconds);
             }
 
             eraseLineAndReturnCarriage();

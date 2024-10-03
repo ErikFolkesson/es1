@@ -36,6 +36,7 @@ void ConfigureUART(void)
     GPIOPinTypeUART(GPIO_PORTA_BASE, GPIO_PIN_0 | GPIO_PIN_1);
 
     uint32_t baudRate = 115200;
+    // 8 data bits, 1 stop bit, and no parity bit.
     uint32_t uartConfig = UART_CONFIG_WLEN_8 | UART_CONFIG_STOP_ONE
             | UART_CONFIG_PAR_NONE;
     // For PIOSC clock, the frequency should be set as 16'000'000
@@ -56,11 +57,13 @@ void ConfigureUART(void)
     UARTEnable(UART0_BASE);
 }
 
+// Prints a char using UART.
 void uartPutChar(int c)
 {
     UARTCharPut(UART0_BASE, c);
 }
 
+// Prints a string using UART. No newline is appended to the output.
 void uartPuts(const char *string)
 {
     uint32_t i;
@@ -71,6 +74,10 @@ void uartPuts(const char *string)
     }
 }
 
+// Reads and returns a char using UART.
+// Also adds read printable characters to an input buffer, or erases a character from the buffer if the read character is a backspace.
+// Read characters are also printed to the terminal to reflect the state of the input buffer.
+// This operation will block until a character is available for reading.
 int32_t uartGetChar(void)
 {
     int32_t c = UARTCharGet(UART0_BASE);
@@ -88,6 +95,8 @@ int32_t uartGetChar(void)
     return c;
 }
 
+// Prints the string representation of the provided int using UART.
+// Precondition: The provided int cannot be larger than 99.
 void uartPrintInt(int number)
 {
     int tenDigit = number / 10;
@@ -97,6 +106,7 @@ void uartPrintInt(int number)
     uartPutChar('0' + oneDigit);
 }
 
+// Returns a pointer to the input buffer containing the input that the user has typed into the terminal.
 const char* uartGetInputBuf(void)
 {
     return userInputBuf;
@@ -118,11 +128,14 @@ void printClock(uint32_t seconds)
     moveCursorToInputPos();
 }
 
+// Prints the ANSI escape sequence to move the cursor to the home position (1,1)
 void moveCursorHome(void)
 {
     uartPuts("\x1B[H");
 }
 
+// Prints the ANSI escape sequences to erase the current line and move the cursor to the first column.
+// The input buffer is also cleared.
 void eraseLineAndReturnCarriage(void)
 {
     // Erase entire line
@@ -135,6 +148,7 @@ void eraseLineAndReturnCarriage(void)
     userInputBuf[0] = '\0';
 }
 
+// Prints the ANSI sequence to move the cursor to the end of the current user input.
 void moveCursorToInputPos(void)
 {
     uartPuts("\x1B[3;");
@@ -143,6 +157,7 @@ void moveCursorToInputPos(void)
     uartPutChar('H');
 }
 
+// Erases a character in both the terminal and the user input buffer.
 void uartEraseChar(void)
 {
     if (userInputBufSize > 0)
@@ -151,7 +166,7 @@ void uartEraseChar(void)
         userInputBuf[userInputBufSize] = '\0';
         uartPutChar('\b');
         // Sending a backspace to the terminal only moves the cursor, it doesn't remove any character.
-        // To erase the character we print a space and then send another backspace.
+        // To erase the character we need to also print a space and then send another backspace.
         uartPutChar(' ');
         uartPutChar('\b');
     }

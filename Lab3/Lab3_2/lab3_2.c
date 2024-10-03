@@ -23,6 +23,8 @@
 
 #define ARRSIZE(arr) (sizeof(arr) / sizeof(*arr))
 
+// Returns the int value that the provided ASCII digit represents (i.e. '5' returns 5).
+// Precondition: The provided character must be an ASCII digit.
 uint8_t charToInt(char c)
 {
     assert(isdigit(c));
@@ -44,6 +46,8 @@ bool isStopCommand(const char *input)
     return strcmp("stop", input) == 0;
 }
 
+// Returns whether the provided string can be interpreted as a clock command.
+// A clock command has the format NN:NN:NN, where each N is a number.
 bool isClockCommand(const char *input)
 {
     size_t size = strlen(input);
@@ -78,7 +82,6 @@ bool isClockCommand(const char *input)
 //*****************************************************************************
 void UARTIntHandler(void)
 {
-    // FIXME: Maybe move functionality to uart.c function instead.
     uint32_t ui32Status;
 
     // Get the interrupt status.

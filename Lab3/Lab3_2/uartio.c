@@ -81,6 +81,10 @@ int32_t uartGetChar(void)
         userInputBuf[userInputBufSize] = '\0';
         uartPutChar(c);
     }
+    else if (c == '\b')
+    {
+        uartEraseChar();
+    }
     return c;
 }
 

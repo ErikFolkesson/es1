@@ -89,11 +89,12 @@ void UARTIntHandler(void)
 
     enum
     {
-        ENTER = '\r', ESC = 0x1B,
+        ENTER = '\r'
     };
 
     while (MAP_UARTCharsAvail(UART0_BASE))
     {
+        // The only situation we have to take care of is when the user has finished inputting a command by pressing enter.
         int32_t c = uartGetChar();
         if (c == ENTER)
         {
@@ -123,10 +124,6 @@ void UARTIntHandler(void)
             }
 
             eraseLineAndReturnCarriage();
-        }
-        else if (c == '\b')
-        {
-            uartEraseChar();
         }
     }
 }

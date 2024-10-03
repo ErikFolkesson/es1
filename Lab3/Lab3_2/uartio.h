@@ -9,7 +9,7 @@ int32_t uartGetChar(void);
 void moveCursorHome(void);
 void moveCursorToInputPos(void);
 void eraseLineAndReturnCarriage(void);
-void printClock(uint32_t counter);
+void printClock(uint32_t seconds);
 void uartPuts(const char *string);
 void uartEraseChar(void);
 

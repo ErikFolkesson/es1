@@ -103,19 +103,18 @@ const char* uartGetInputBuf(void)
 }
 
 // Prints a clock in the format HH:MM:SS in position 1,1 in the terminal.
-// FIXME: Should we take in hours, minutes, seconds instead of just seconds here?
-void printClock(uint32_t counter)
+void printClock(uint32_t seconds)
 {
-    uint32_t hours = counter / 60 / 60;
-    uint32_t minutes = counter / 60 % 60;
-    uint32_t seconds = counter % 60;
+    uint32_t hours = seconds / 60 / 60;
+    uint32_t minutes = seconds / 60 % 60;
+    uint32_t remainingSeconds = seconds % 60;
 
     moveCursorHome();
     uartPrintInt(hours);
     uartPutChar(':');
     uartPrintInt(minutes);
     uartPutChar(':');
-    uartPrintInt(seconds);
+    uartPrintInt(remainingSeconds);
     moveCursorToInputPos();
 }
 

@@ -15,7 +15,6 @@
 #include "driverlib/pwm.h"
 #include "driverlib/sysctl.h"
 #include "driverlib/uart.h"
-#include "utils/uartstdio.h"
 #include "driverlib/rom.h"
 #include "driverlib/rom_map.h"
 #include "driverlib/timer.h"
@@ -121,11 +120,12 @@ void UARTIntHandler(void)
 //*****************************************************************************
 int main(void)
 {
+
     ConfigureUART();
 
     setupTimer();
 
-    UARTprintf("\x1B[2J\x1B[2;1HEnter command below:\x1B[1E");
+    uartPuts("\x1B[2J\x1B[2;1HEnter command below:\x1B[1E");
 
     while (1)
     {

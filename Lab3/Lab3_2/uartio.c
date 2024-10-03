@@ -34,8 +34,14 @@ void ConfigureUART(void)
     GPIOPinConfigure(GPIO_PA0_U0RX);
     GPIOPinConfigure(GPIO_PA1_U0TX);
     GPIOPinTypeUART(GPIO_PORTA_BASE, GPIO_PIN_0 | GPIO_PIN_1);
+
+    uint32_t baudRate = 115200;
+    uint32_t uartConfig = UART_CONFIG_WLEN_8 | UART_CONFIG_STOP_ONE
+            | UART_CONFIG_PAR_NONE;
+    // For PIOSC clock, the frequency should be set as 16'000'000
+    uint32_t systemClockFrequency = 16000000;
+    UARTConfigSetExpClk(UART0_BASE, systemClockFrequency, baudRate, uartConfig);
     UARTClockSourceSet(UART0_BASE, UART_CLOCK_PIOSC);
-    UARTStdioConfig(0, 115200, 16000000); // FIXME: Can remove if we don't use UARTprintf.
 
     // Enable processor interrupts.
     MAP_IntMasterEnable();
@@ -46,8 +52,9 @@ void ConfigureUART(void)
     // Enable the UART interrupt.
     MAP_IntEnable(INT_UART0);
     MAP_UARTIntEnable(UART0_BASE, UART_INT_RX | UART_INT_RT);
-}
 
+    UARTEnable(UART0_BASE);
+}
 
 void uartPutChar(int c)
 {
@@ -102,7 +109,7 @@ void printClock(uint32_t counter)
     uint32_t hours = counter / 60 / 60;
     uint32_t minutes = counter / 60 % 60;
     uint32_t seconds = counter % 60;
-    // FIXME: Use own functions instead of UARTprintf?
+
     moveCursorHome();
     uartPrintInt(hours);
     uartPutChar(':');
@@ -110,9 +117,6 @@ void printClock(uint32_t counter)
         uartPutChar(':');
         uartPrintInt(seconds);
         moveCursorToInputPos();
-
-    //UARTprintf("\x1B[H%02u:%02u:%02u\x1B[3;%dH", hours, minutes, seconds,
-    //           userInputBufSize + 1);
 }
 
 void moveCursorHome(void)

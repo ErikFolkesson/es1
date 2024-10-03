@@ -88,12 +88,11 @@ int32_t uartGetChar(void)
     return c;
 }
 
-void uartPrintInt(int d)
+void uartPrintInt(int number)
 {
-    int tenDigit = d / 10;
-    // FIXME: This limits the int to 100 characters.
-    assert(tenDigit < 10);
-    int oneDigit = d % 10;
+    int tenDigit = number / 10;
+    assert(tenDigit < 10); // Don't handle ints larger than 99.
+    int oneDigit = number % 10;
     uartPutChar('0' + tenDigit);
     uartPutChar('0' + oneDigit);
 }

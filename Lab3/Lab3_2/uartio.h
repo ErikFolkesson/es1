@@ -10,7 +10,7 @@ void moveCursorHome(void);
 void moveCursorToInputPos(void);
 void eraseLineAndReturnCarriage(void);
 void printClock(uint32_t counter);
-void uartPuts(const char* string);
+void uartPuts(const char *string);
 void uartEraseChar(void);
 
 #endif /* UARTIO_H_ */

@@ -55,7 +55,7 @@ void UARTIntHandler(void)
         int32_t c = uartGetChar();
         if (c == ENTER)
         {
-            const char* userInputBuf = uartGetInputBuf();
+            const char *userInputBuf = uartGetInputBuf();
             if (strcmp("start", userInputBuf) == 0)
             {
                 startTimer();
@@ -103,8 +103,6 @@ void UARTIntHandler(void)
             }
 
             eraseLineAndReturnCarriage();
-
-
         }
         else if (c == '\b')
         {
@@ -120,7 +118,6 @@ void UARTIntHandler(void)
 //*****************************************************************************
 int main(void)
 {
-
     ConfigureUART();
 
     setupTimer();
@@ -129,6 +126,5 @@ int main(void)
 
     while (1)
     {
-
     }
 }

@@ -61,7 +61,6 @@ void uartPutChar(int c)
     UARTCharPut(UART0_BASE, c);
 }
 
-
 void uartPuts(const char *string)
 {
     uint32_t i;
@@ -71,7 +70,6 @@ void uartPuts(const char *string)
         UARTCharPut(UART0_BASE, string[i]);
     }
 }
-
 
 int32_t uartGetChar(void)
 {
@@ -86,8 +84,8 @@ int32_t uartGetChar(void)
     return c;
 }
 
-
-void uartPrintInt(int d) {
+void uartPrintInt(int d)
+{
     int tenDigit = d / 10;
     // FIXME: This limits the int to 100 characters.
     assert(tenDigit < 10);
@@ -101,7 +99,6 @@ const char* uartGetInputBuf(void)
     return userInputBuf;
 }
 
-
 // Prints a clock in the format HH:MM:SS in position 1,1 in the terminal.
 // FIXME: Should we take in hours, minutes, seconds instead of just seconds here?
 void printClock(uint32_t counter)
@@ -114,9 +111,9 @@ void printClock(uint32_t counter)
     uartPrintInt(hours);
     uartPutChar(':');
     uartPrintInt(minutes);
-        uartPutChar(':');
-        uartPrintInt(seconds);
-        moveCursorToInputPos();
+    uartPutChar(':');
+    uartPrintInt(seconds);
+    moveCursorToInputPos();
 }
 
 void moveCursorHome(void)

@@ -158,13 +158,29 @@ void UART_reset(void)
 // FIXME: The lab spec doesn't show the arguments for this function, but this seems like the only logical one?
 void UART_putString(const char *string)
 {
-    // TODO: According to the spec, this function should use UART_putChar.
-    assert(false); // Not implemented.
+    // Get the length of the string.
+    uint16_t len = sizeof(string) / sizeof(string[0]);
+    uint16_t i;
+
+    // Loop through the string, sending each char to UART_putChar()
+    for (i = 0; i < len; i++) {
+        UART_putChar(string[i]);
+    }
 }
 
 // FIXME: The lab spec doesn't show the arguments for this function. I assume this is what they want?
 void UART_getString(char *buf, uint32_t bufSize)
 {
-    // TODO: According to the spec, this function should use UART_getChar.
-    assert(false); // Not implemented.
+    uint16_t i;
+
+    // Keep reading characters until the entire buffer is full
+    // or until we get a newline character.
+    for (i = 0; i < bufSize; i++) {
+        char c = UART_getChar();
+        if (c == '\n') {
+            // We have got a newline character, terminate
+            break;
+        }
+        buf[i] = c;
+    }
 }

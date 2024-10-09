@@ -11,9 +11,10 @@
 // Register offsets
 #define CC_REG_OFFSET 0xFC8U
 #define CTL_REG_OFFSET 0x030U
-#define FLAG_REG_OFFSET 0x018U
+#define FLAG_REG_OFFSET 0x018U // FLAG REGISTER (UARTFR)
 #define LINE_CONTROL_REG_OFFSET 0x02CU
 #define INT_CLEAR_REG_OFFSET 0x044U
+#define DATA_REG_OFFSET 0x000U // DATA REGISTER (UARTDR)
 
 #define RCGCUART_REG SYSCTL_RCGCUART_R
 
@@ -28,6 +29,9 @@
 
 // FLAG bits.
 #define FLAG_BUSY 0x08U
+#define FLAG_RXFE 0x010U // Receive FIFO empty
+#define FLAG_TXFF 0x020U // Transmit FIFO full
+
 
 // FIXME: Figure out if this is allowed/if we want to do it another way.
 #define UART0_BASE              0x4000C000
@@ -100,16 +104,28 @@ void UART_init(uint32_t base)
 char UART_getChar(void)
 {
     // Make sure the driver has been initialized before accessing the hardware.
+    // Do this by checking that we have a non-zero base
+    assert(g_base != 0);
 
-    assert(false); // Not implemented.
+    // Wait until the receive FIFO is not empty
+    while (REG(g_base + FLAG_REG_OFFSET) & FLAG_RXFE) {}
+
+    // FIFO is non-empty, read and return the next character.
+    return(REG(g_base + DATA_REG_OFFSET));
 }
 
 void UART_putChar(char c)
 {
     // Make sure the driver has been initialized before accessing the hardware.
-    // Write data using UARTDR register.
+    // Do this by checking that we have a non-zero base
+    assert(g_base != 0);
 
-    assert(false); // Not implemented.
+    // Wait until transmit FIFO no longer is full
+    while ((REG(g_base + FLAG_REG_OFFSET) & FLAG_TXFF)) {}
+
+    // Transmit FIFO is not full
+    // Write data using UARTDR register.
+    REG(g_base + DATA_REG_OFFSET) = c;
 }
 
 void UART_reset(void)

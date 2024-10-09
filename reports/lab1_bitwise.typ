@@ -10,7 +10,7 @@ Either press the red terminate button in the toolbar or press Ctrl+F2.
 
 == 2. How do you terminate the program running on the dev board?
 
-Press the reset button on the board.
+Since the board runs the program as soon as it receives power, the only way to terminate the program is to disconnect the board from its power supply.
 
 == 3. Operations
 

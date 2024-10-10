@@ -173,6 +173,8 @@ uint32_t gpio_pins_for_uart_base(UartBase uartBase) {
     case UART4_BASE:
             return GPIO_PIN_2 | GPIO_PIN_3;
     }
+    assert(0); // Invalid UART base provided.
+    return 0; // FIXME: Silence warning about no return statement.
 }
 
 void UART_init(uint32_t uartBase)

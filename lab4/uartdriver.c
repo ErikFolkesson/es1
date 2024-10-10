@@ -201,7 +201,7 @@ void UART_init(uint32_t uartBase)
     // FIXME: This will disable all other gpio ports. Is this the desired behavior?
     RCGCGPIO_REG = gpioBit;
     //     1.3 Set GPIO AFSEL bits for appropriate pins (page 778). To determine GPIOs to configure, see table 29-4 (page 1921)
-    REG(g_gpioBase.value + GPIOAFSEL_REG_OFFSET) |= gpio_pins_for_uart_port(g_uartBase);
+    REG(g_gpioBase.value + GPIOAFSEL_REG_OFFSET) |= gpio_pins_for_uart_base(g_uartBase);
     //     1.4 Configure GPIO current level and/or slew rate as specified for mode selected (page 780 and 788).
 
     //     1.5 Configure PMCn fields in GPIOPCTL register to assign UART signals to appropriate pins (page 795, table 29-5 page 1932).

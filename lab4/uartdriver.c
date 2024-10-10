@@ -199,7 +199,7 @@ void UART_init(uint32_t uartBase)
     // FIXME: This will disable all other gpio ports. Is this the desired behavior?
     RCGCGPIO_REG = gpioBit;
     //     1.3 Set GPIO AFSEL bits for appropriate pins (page 778). To determine GPIOs to configure, see table 29-4 (page 1921)
-    REG(g_gpioBase + GPIOAFSEL_REG_OFFSET) |= gpio_pins_for_uart_port(g_uartBase);
+    REG(g_gpioBase.value + GPIOAFSEL_REG_OFFSET) |= gpio_pins_for_uart_port(g_uartBase);
     //     1.4 Configure GPIO current level and/or slew rate as specified for mode selected (page 780 and 788).
 
     //     1.5 Configure PMCn fields in GPIOPCTL register to assign UART signals to appropriate pins (page 795, table 29-5 page 1932).
@@ -243,27 +243,27 @@ char UART_getChar(void)
 {
     // Make sure the driver has been initialized before accessing the hardware.
     // Do this by checking that we have a non-zero base
-    assert(g_base != 0);
+    assert(g_uartBase.value != 0);
 
     // Wait until the receive FIFO is not empty
-    while (REG(g_base + FLAG_REG_OFFSET) & FLAG_RXFE) {}
+    while (REG(g_uartBase.value + FLAG_REG_OFFSET) & FLAG_RXFE) {}
 
     // FIFO is non-empty, read and return the next character.
-    return(REG(g_base + DATA_REG_OFFSET));
+    return(REG(g_uartBase.value + DATA_REG_OFFSET));
 }
 
 void UART_putChar(char c)
 {
     // Make sure the driver has been initialized before accessing the hardware.
     // Do this by checking that we have a non-zero base
-    assert(g_base != 0);
+    assert(g_uartBase.value != 0);
 
     // Wait until transmit FIFO no longer is full
-    while ((REG(g_base + FLAG_REG_OFFSET) & FLAG_TXFF)) {}
+    while ((REG(g_uartBase.value + FLAG_REG_OFFSET) & FLAG_TXFF)) {}
 
     // Transmit FIFO is not full
     // Write data using UARTDR register.
-    REG(g_base + DATA_REG_OFFSET) = c;
+    REG(g_uartBase.value + DATA_REG_OFFSET) = c;
 }
 
 void UART_reset(void)

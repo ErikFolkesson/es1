@@ -20,18 +20,24 @@
 #define INT_CLEAR_REG_OFFSET 0x044U
 #define DATA_REG_OFFSET 0x000U // DATA REGISTER (UARTDR)
 #define GPIOAFSEL_REG_OFFSET 0x420U
+#define GPIOPCTL_REG_OFFSET 0x52CU // Port control
 
 #define RCGCUART_REG SYSCTL_RCGCUART_R
 #define RCGCGPIO_REG SYSCTL_RCGCGPIO_R
 
+#define PIOSC_VALUE UART_CC_CS_PIOSC
+
 // Line control bits.
-#define LINE_CONTROL_FEN 0x8U // Enable/disable FIFO
+#define LINE_CONTROL_FEN UART_LCRH_FEN // Enable/disable FIFO
+#define LINE_CONTROL_MSG_LEN UART_LCRH_WLEN_8
 
 // RCGCUART bits.
 //SYSCTL_RCGCUART_R0
 
 // CTL bits.
 #define CTL_UARTEN UART_CTL_UARTEN
+#define CTL_UART_TX_EN UART_CTL_TXE
+#define CTL_UART_RX_EN UART_CTL_RXE
 
 // FLAG bits.
 #define FLAG_BUSY 0x08U
@@ -198,13 +204,21 @@ void UART_init(uint32_t uartBase)
     RCGCUART_REG = rcgcuartBit;
     //     1.2 Enable clock to appropriate GPIO module via RCGCGPIO register (page 389). GPIO port enabling info in table 29-5 (page 1932).
     const uint32_t gpioBit = to_rcgcgpio_port_bit(g_gpioBase);
+    //         Set clock source
+    REG(g_uartBase.value + CC_REG_OFFSET) = PIOSC_VALUE;
+
     // FIXME: This will disable all other gpio ports. Is this the desired behavior?
     RCGCGPIO_REG = gpioBit;
     //     1.3 Set GPIO AFSEL bits for appropriate pins (page 778). To determine GPIOs to configure, see table 29-4 (page 1921)
     REG(g_gpioBase.value + GPIOAFSEL_REG_OFFSET) |= gpio_pins_for_uart_base(g_uartBase);
     //     1.4 Configure GPIO current level and/or slew rate as specified for mode selected (page 780 and 788).
+    // FIXME: Set to 2mA (GPIODR2R), offset 0x500 (Is already set by default)
+    // Set slew rate: FIXME: (According to data sheet 2mA doesn't need to?)
+
 
     //     1.5 Configure PMCn fields in GPIOPCTL register to assign UART signals to appropriate pins (page 795, table 29-5 page 1932).
+    // FIXME: Need to write a 1 to all parts of the register that correspond to the pins we use. Can probably use loop over bits and do 1 << (i * 4). For now we hard code.
+    REG(g_uartBase.value + GPIOPCTL_REG_OFFSET) |= 17U; // 4th and 0th bit set.
 
     // What is done in SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOA):
 
@@ -225,20 +239,29 @@ void UART_init(uint32_t uartBase)
 
     // 2. Set the baud rate.
     // FIXME: "This internal register [UARTLCRH] is only updated when a write operation to UARTLCRH is performed, so any changes to the baud-rate divisor must be followed by a write to the UARTLCRH register for the changes to take effect."
+    // FIXME: We try disabling UART before writing this????
     REG(g_uartBase.value + BAUD_FRAC_REG_OFFSET) = BRDFRAC;
     REG(g_uartBase.value + BAUD_INT_REG_OFFSET) = BRDINT;
     // 3. Set the message length.
-
-    // 4. Initialize the stop bit.
-
+    // Parity bit set to 0 disables and stop bit set to 0 uses one stop bit, so those are implicitly the correct values.
+    REG(g_uartBase.value + LINE_CONTROL_REG_OFFSET) |= LINE_CONTROL_MSG_LEN | UART_LCRH_FEN;
     // 5. Set the driver to normal mode.
+    // FIXME: It seems like it might be normal mode by default?
 
     // 6. Enable the communication.
+    // Enable UART and tx/rx.
+    // FIXME: Break error and framing error occurs due to this.
+    REG(g_uartBase.value + CTL_REG_OFFSET) |= CTL_UARTEN | CTL_UART_TX_EN | CTL_UART_RX_EN;
+
+
 
     // 7. Enable the digital register bit for the GPIO pins.
+    // FIXME: Do we need to do something to open drain, pull up, and pull down?
+    // FIXME: Is this done in steps 1.2/1.3?
+    // FIXME: Don't hard code if we need to handle multiple ports.
+    GPIO_PORTA_AHB_DEN_R = 0x3;
 
     // Check specification for more details.
-    assert(false); // Not implemented.
 }
 
 char UART_getChar(void)
@@ -270,6 +293,10 @@ void UART_putChar(char c)
 
 void UART_reset(void)
 {
+    // FIXME: Figure out what to actually do here.
+
+
+
     // Reset both UART and GPIO modules
 
     // The UARTCTL register is the control register.
@@ -294,6 +321,13 @@ void UART_reset(void)
 
     // 5. Enable the UART
     REG(g_uartBase.value + CTL_REG_OFFSET) |= CTL_UARTEN;
+
+
+
+    // FIXME: In spec, the program should error when trying to read string after resetting without initing.
+    //        Seems like the UART should be reset?
+    g_uartBase.value = 0;
+    g_gpioBase.value = 0;
 }
 
 // FIXME: The lab spec doesn't show the arguments for this function, but this seems like the only logical one?

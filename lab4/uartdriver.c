@@ -92,97 +92,7 @@ typedef struct
 static UartBase g_uartBase;
 static GpioBase g_gpioBase;
 
-static uint32_t to_rcgcuart_bit(UartBase uartBase)
-{
-    switch (uartBase.value)
-    {
-    case UART0_BASE:
-        return SYSCTL_RCGCUART_R0;
-    case UART1_BASE:
-        return SYSCTL_RCGCUART_R1;
-    case UART2_BASE:
-        return SYSCTL_RCGCUART_R2;
-    case UART3_BASE:
-        return SYSCTL_RCGCUART_R3;
-    case UART4_BASE:
-        return SYSCTL_RCGCUART_R4;
-    case UART5_BASE:
-        return SYSCTL_RCGCUART_R5;
-    case UART6_BASE:
-        return SYSCTL_RCGCUART_R6;
-    case UART7_BASE:
-        return SYSCTL_RCGCUART_R7;
-    }
-    assert(0); // Faulty uart base provided.
-    return 0; // FIXME: Silence warning about no return statement.
-}
-
-static GpioBase to_gpio_base(UartBase uartBase)
-{
-    GpioBase retVal = { 0 };
-    switch (uartBase.value)
-    {
-    case UART0_BASE: // Fallthrough.
-    case UART2_BASE: // FIXME: UART2 can be both A and D?
-    case UART3_BASE: // FIXME: UART3 can be both A and J?
-    case UART4_BASE: // FIXME: UART4 can be both port A and port K?
-        retVal.value = GPIO_PORT_A_BASE;
-        return retVal;
-
-    case UART1_BASE:
-        retVal.value = GPIO_PORT_B_BASE;
-        return retVal;
-
-    case UART5_BASE: // Fallthrough.
-    case UART7_BASE:
-        retVal.value = GPIO_PORT_C_BASE;
-        return retVal;
-
-    case UART6_BASE:
-        retVal.value = GPIO_PORT_P_BASE;
-        return retVal;
-    }
-    assert(0); // Invalid UART base provided.
-    return retVal; // FIXME: Silence warning about no return statement.
-}
-
-static uint32_t to_rcgcgpio_port_bit(GpioBase gpioBase)
-{
-    switch (gpioBase.value)
-    {
-    case GPIO_PORT_A_BASE:
-        return SYSCTL_RCGCGPIO_R0;
-    case GPIO_PORT_B_BASE:
-        return SYSCTL_RCGCGPIO_R1;
-    case GPIO_PORT_C_BASE:
-        return SYSCTL_RCGCGPIO_R2;
-    case GPIO_PORT_P_BASE:
-        return SYSCTL_RCGCGPIO_R13;
-    }
-    assert(0); // Invalid GPIO base provided.
-    return 0; // FIXME: Silence warning about no return statement.
-}
-
-uint32_t gpio_pins_for_uart_base(UartBase uartBase) {
-
-    switch (uartBase.value) {
-    case UART0_BASE: // Fallthrough.
-    case UART1_BASE:
-    case UART6_BASE:
-            return GPIO_PIN_0 | GPIO_PIN_1;
-    case UART3_BASE: // Fallthrough.
-    case UART7_BASE:
-            return GPIO_PIN_4 | GPIO_PIN_5;
-    case UART2_BASE: // Fallthrough.
-    case UART5_BASE:
-            return GPIO_PIN_6 | GPIO_PIN_7;
-    case UART4_BASE:
-            return GPIO_PIN_2 | GPIO_PIN_3;
-    }
-    assert(0); // Invalid UART base provided.
-    return 0; // FIXME: Silence warning about no return statement.
-}
-
+// FIXME: If we are supposed to only support UART0, why do we receive uartBase here??
 void UART_init(uint32_t uartBase)
 {
     // The driver should operate at 9600 baud.
@@ -195,22 +105,18 @@ void UART_init(uint32_t uartBase)
     // 1. Reset the driver to avoid unpredictable behavior during initialization.
     // FIXME: Do we need to reset or not?
     // UART_reset();
-    g_uartBase.value = uartBase;
-    g_gpioBase = to_gpio_base(g_uartBase);
+    g_uartBase.value = UART0_BASE;
+    g_gpioBase.value = GPIO_PORT_A_BASE;
 
     //     1.1 Enable UART module using RCGCUART register (page 395)
-    const uint32_t rcgcuartBit = to_rcgcuart_bit(g_uartBase);
-    // FIXME: This will disable all other UART modules than `base`. Is that desired behavior?
-    RCGCUART_REG = rcgcuartBit;
+    RCGCUART_REG = SYSCTL_RCGCUART_R0;
     //     1.2 Enable clock to appropriate GPIO module via RCGCGPIO register (page 389). GPIO port enabling info in table 29-5 (page 1932).
-    const uint32_t gpioBit = to_rcgcgpio_port_bit(g_gpioBase);
+
     //         Set clock source
     REG(g_uartBase.value + CC_REG_OFFSET) = PIOSC_VALUE;
-
-    // FIXME: This will disable all other gpio ports. Is this the desired behavior?
-    RCGCGPIO_REG = gpioBit;
+    RCGCGPIO_REG = SYSCTL_RCGCGPIO_R0;
     //     1.3 Set GPIO AFSEL bits for appropriate pins (page 778). To determine GPIOs to configure, see table 29-4 (page 1921)
-    REG(g_gpioBase.value + GPIOAFSEL_REG_OFFSET) |= gpio_pins_for_uart_base(g_uartBase);
+    REG(g_gpioBase.value + GPIOAFSEL_REG_OFFSET) |= GPIO_PIN_0 | GPIO_PIN_1;
     //     1.4 Configure GPIO current level and/or slew rate as specified for mode selected (page 780 and 788).
     // FIXME: Set to 2mA (GPIODR2R), offset 0x500 (Is already set by default)
     // Set slew rate: FIXME: (According to data sheet 2mA doesn't need to?)

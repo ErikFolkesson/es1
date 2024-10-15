@@ -281,7 +281,7 @@ void UART_getString(char *buf, uint32_t bufSize)
     for (i = 0; i < bufSize - 1; i++)
     {
         char c = UART_getChar();
-        if (c == '\n')
+        if (c == '\r')
         {
             // We have got a newline character, terminate
             break;

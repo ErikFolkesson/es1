@@ -8,19 +8,63 @@
 #include <assert.h>
 #include <stdbool.h>
 
-// UART Register offsets
-#define CC_REG_OFFSET 0xFC8U
-#define CTL_REG_OFFSET 0x030U
-#define FLAG_REG_OFFSET 0x018U // FLAG REGISTER (UARTFR)
-#define LINE_CONTROL_REG_OFFSET 0x02CU
-#define BAUD_FRAC_REG_OFFSET 0x028U
-#define BAUD_INT_REG_OFFSET 0x024U
+// FIXME: These are taken from inc/tm4c129encpdt.h. They are only here to collect the macros we might need in one place. They can be removed once we're done.
+#define UART0_DR_R              (*((volatile uint32_t *)0x4000C000))
+#define UART0_RSR_R             (*((volatile uint32_t *)0x4000C004))
+#define UART0_ECR_R             (*((volatile uint32_t *)0x4000C004))
+#define UART0_FR_R              (*((volatile uint32_t *)0x4000C018))
+#define UART0_ILPR_R            (*((volatile uint32_t *)0x4000C020))
+#define UART0_IBRD_R            (*((volatile uint32_t *)0x4000C024))
+#define UART0_FBRD_R            (*((volatile uint32_t *)0x4000C028))
+#define UART0_LCRH_R            (*((volatile uint32_t *)0x4000C02C))
+#define UART0_CTL_R             (*((volatile uint32_t *)0x4000C030))
+#define UART0_IFLS_R            (*((volatile uint32_t *)0x4000C034))
+#define UART0_IM_R              (*((volatile uint32_t *)0x4000C038))
+#define UART0_RIS_R             (*((volatile uint32_t *)0x4000C03C))
+#define UART0_MIS_R             (*((volatile uint32_t *)0x4000C040))
+#define UART0_ICR_R             (*((volatile uint32_t *)0x4000C044))
+#define UART0_DMACTL_R          (*((volatile uint32_t *)0x4000C048))
+#define UART0_9BITADDR_R        (*((volatile uint32_t *)0x4000C0A4))
+#define UART0_9BITAMASK_R       (*((volatile uint32_t *)0x4000C0A8))
+#define UART0_PP_R              (*((volatile uint32_t *)0x4000CFC0))
+#define UART0_CC_R              (*((volatile uint32_t *)0x4000CFC8))
 
-// GPIO Register offsets
-#define INT_CLEAR_REG_OFFSET 0x044U
-#define DATA_REG_OFFSET 0x000U // DATA REGISTER (UARTDR)
-#define GPIOAFSEL_REG_OFFSET 0x420U
-#define GPIOPCTL_REG_OFFSET 0x52CU // Port control
+#define GPIO_PORTA_AHB_DATA_BITS_R                                             \
+                                ((volatile uint32_t *)0x40058000) // FIXME: This doesn't dereference?? I assume we probably don't need to read from it since we use the UART data register instead, so probably fine?
+#define GPIO_PORTA_AHB_DATA_R   (*((volatile uint32_t *)0x400583FC))
+#define GPIO_PORTA_AHB_DIR_R    (*((volatile uint32_t *)0x40058400))
+#define GPIO_PORTA_AHB_IS_R     (*((volatile uint32_t *)0x40058404))
+#define GPIO_PORTA_AHB_IBE_R    (*((volatile uint32_t *)0x40058408))
+#define GPIO_PORTA_AHB_IEV_R    (*((volatile uint32_t *)0x4005840C))
+#define GPIO_PORTA_AHB_IM_R     (*((volatile uint32_t *)0x40058410))
+#define GPIO_PORTA_AHB_RIS_R    (*((volatile uint32_t *)0x40058414))
+#define GPIO_PORTA_AHB_MIS_R    (*((volatile uint32_t *)0x40058418))
+#define GPIO_PORTA_AHB_ICR_R    (*((volatile uint32_t *)0x4005841C))
+#define GPIO_PORTA_AHB_AFSEL_R  (*((volatile uint32_t *)0x40058420))
+#define GPIO_PORTA_AHB_DR2R_R   (*((volatile uint32_t *)0x40058500))
+#define GPIO_PORTA_AHB_DR4R_R   (*((volatile uint32_t *)0x40058504))
+#define GPIO_PORTA_AHB_DR8R_R   (*((volatile uint32_t *)0x40058508))
+#define GPIO_PORTA_AHB_ODR_R    (*((volatile uint32_t *)0x4005850C))
+#define GPIO_PORTA_AHB_PUR_R    (*((volatile uint32_t *)0x40058510))
+#define GPIO_PORTA_AHB_PDR_R    (*((volatile uint32_t *)0x40058514))
+#define GPIO_PORTA_AHB_SLR_R    (*((volatile uint32_t *)0x40058518))
+#define GPIO_PORTA_AHB_DEN_R    (*((volatile uint32_t *)0x4005851C))
+#define GPIO_PORTA_AHB_LOCK_R   (*((volatile uint32_t *)0x40058520))
+#define GPIO_PORTA_AHB_CR_R     (*((volatile uint32_t *)0x40058524))
+#define GPIO_PORTA_AHB_AMSEL_R  (*((volatile uint32_t *)0x40058528))
+#define GPIO_PORTA_AHB_PCTL_R   (*((volatile uint32_t *)0x4005852C))
+#define GPIO_PORTA_AHB_ADCCTL_R (*((volatile uint32_t *)0x40058530))
+#define GPIO_PORTA_AHB_DMACTL_R (*((volatile uint32_t *)0x40058534))
+#define GPIO_PORTA_AHB_SI_R     (*((volatile uint32_t *)0x40058538))
+#define GPIO_PORTA_AHB_DR12R_R  (*((volatile uint32_t *)0x4005853C))
+#define GPIO_PORTA_AHB_WAKEPEN_R                                              \
+                                (*((volatile uint32_t *)0x40058540))
+#define GPIO_PORTA_AHB_WAKELVL_R                                              \
+                                (*((volatile uint32_t *)0x40058544))
+#define GPIO_PORTA_AHB_WAKESTAT_R                                             \
+                                (*((volatile uint32_t *)0x40058548))
+#define GPIO_PORTA_AHB_PP_R     (*((volatile uint32_t *)0x40058FC0))
+#define GPIO_PORTA_AHB_PC_R     (*((volatile uint32_t *)0x40058FC4))
 
 #define RCGCUART_REG SYSCTL_RCGCUART_R
 #define RCGCGPIO_REG SYSCTL_RCGCGPIO_R
@@ -40,36 +84,19 @@
 #define CTL_UART_RX_EN UART_CTL_RXE
 
 // FLAG bits.
-#define FLAG_BUSY 0x08U
-#define FLAG_RXFE 0x010U // Receive FIFO empty
-#define FLAG_TXFF 0x020U // Transmit FIFO full
-
+#define FLAG_BUSY UART_FR_BUSY
+#define FLAG_RXFE UART_FR_RXFE // Receive FIFO empty
+#define FLAG_TXFF UART_FR_TXFF // Transmit FIFO full
 
 // FIXME: Figure out if this is allowed/if we want to do it another way.
 #define UART0_BASE              0x4000C000
-#define UART1_BASE              0x4000D000
-#define UART2_BASE              0x4000E000
-#define UART3_BASE              0x4000F000
-#define UART4_BASE              0x40010000
-#define UART5_BASE              0x40011000
-#define UART6_BASE              0x40012000
-#define UART7_BASE              0x40013000
 
 #define REG(n) (*((volatile uint32_t*) (n)))
 
 #define GPIO_PORT_A_BASE 0x40058000U
-#define GPIO_PORT_B_BASE 0x40059000U
-#define GPIO_PORT_C_BASE 0x4005A000U
-#define GPIO_PORT_P_BASE 0x40065000U
 
 #define GPIO_PIN_0 (1U << 0U)
 #define GPIO_PIN_1 (1U << 1U)
-#define GPIO_PIN_2 (1U << 2U)
-#define GPIO_PIN_3 (1U << 3U)
-#define GPIO_PIN_4 (1U << 4U)
-#define GPIO_PIN_5 (1U << 5U)
-#define GPIO_PIN_6 (1U << 7U)
-#define GPIO_PIN_7 (1U << 7U)
 
 #define BAUDCLOCK 16000000U
 #define BAUDRATE 9600U
@@ -113,18 +140,17 @@ void UART_init(uint32_t uartBase)
     //     1.2 Enable clock to appropriate GPIO module via RCGCGPIO register (page 389). GPIO port enabling info in table 29-5 (page 1932).
 
     //         Set clock source
-    REG(g_uartBase.value + CC_REG_OFFSET) = PIOSC_VALUE;
+    UART0_CC_R = PIOSC_VALUE;
     RCGCGPIO_REG = SYSCTL_RCGCGPIO_R0;
     //     1.3 Set GPIO AFSEL bits for appropriate pins (page 778). To determine GPIOs to configure, see table 29-4 (page 1921)
-    REG(g_gpioBase.value + GPIOAFSEL_REG_OFFSET) |= GPIO_PIN_0 | GPIO_PIN_1;
+    GPIO_PORTA_AHB_AFSEL_R |= GPIO_PIN_0 | GPIO_PIN_1;
     //     1.4 Configure GPIO current level and/or slew rate as specified for mode selected (page 780 and 788).
     // FIXME: Set to 2mA (GPIODR2R), offset 0x500 (Is already set by default)
     // Set slew rate: FIXME: (According to data sheet 2mA doesn't need to?)
 
-
     //     1.5 Configure PMCn fields in GPIOPCTL register to assign UART signals to appropriate pins (page 795, table 29-5 page 1932).
     // FIXME: Need to write a 1 to all parts of the register that correspond to the pins we use. Can probably use loop over bits and do 1 << (i * 4). For now we hard code.
-    REG(g_uartBase.value + GPIOPCTL_REG_OFFSET) |= 17U; // 4th and 0th bit set.
+    GPIO_PORTA_AHB_PCTL_R |= 17U; // 4th and 0th bit set.
 
     // What is done in SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOA):
 
@@ -146,20 +172,18 @@ void UART_init(uint32_t uartBase)
     // 2. Set the baud rate.
     // FIXME: "This internal register [UARTLCRH] is only updated when a write operation to UARTLCRH is performed, so any changes to the baud-rate divisor must be followed by a write to the UARTLCRH register for the changes to take effect."
     // FIXME: We try disabling UART before writing this????
-    REG(g_uartBase.value + BAUD_FRAC_REG_OFFSET) = BRDFRAC;
-    REG(g_uartBase.value + BAUD_INT_REG_OFFSET) = BRDINT;
+    UART0_FBRD_R = BRDFRAC;
+    UART0_IBRD_R = BRDINT;
     // 3. Set the message length.
     // Parity bit set to 0 disables and stop bit set to 0 uses one stop bit, so those are implicitly the correct values.
-    REG(g_uartBase.value + LINE_CONTROL_REG_OFFSET) |= LINE_CONTROL_MSG_LEN | UART_LCRH_FEN;
+    UART0_LCRH_R |= LINE_CONTROL_MSG_LEN | UART_LCRH_FEN;
     // 5. Set the driver to normal mode.
     // FIXME: It seems like it might be normal mode by default?
 
     // 6. Enable the communication.
     // Enable UART and tx/rx.
     // FIXME: Break error and framing error occurs due to this.
-    REG(g_uartBase.value + CTL_REG_OFFSET) |= CTL_UARTEN | CTL_UART_TX_EN | CTL_UART_RX_EN;
-
-
+    UART0_CTL_R |= CTL_UARTEN | CTL_UART_TX_EN | CTL_UART_RX_EN;
 
     // 7. Enable the digital register bit for the GPIO pins.
     // FIXME: Do we need to do something to open drain, pull up, and pull down?
@@ -177,10 +201,12 @@ char UART_getChar(void)
     assert(g_uartBase.value != 0);
 
     // Wait until the receive FIFO is not empty
-    while (REG(g_uartBase.value + FLAG_REG_OFFSET) & FLAG_RXFE) {}
+    while (UART0_FR_R & FLAG_RXFE)
+    {
+    }
 
     // FIFO is non-empty, read and return the next character.
-    return(REG(g_uartBase.value + DATA_REG_OFFSET));
+    return UART0_DR_R;
 }
 
 void UART_putChar(char c)
@@ -190,11 +216,13 @@ void UART_putChar(char c)
     assert(g_uartBase.value != 0);
 
     // Wait until transmit FIFO no longer is full
-    while ((REG(g_uartBase.value + FLAG_REG_OFFSET) & FLAG_TXFF)) {}
+    while (UART0_FR_R & FLAG_TXFF)
+    {
+    }
 
     // Transmit FIFO is not full
     // Write data using UARTDR register.
-    REG(g_uartBase.value + DATA_REG_OFFSET) = c;
+    UART0_DR_R = c;
 }
 
 void UART_reset(void)
@@ -209,26 +237,25 @@ void UART_reset(void)
     // All the bits are cleared on reset except for the Transmit Enable (TXE) and Receive Enable (RXE) bits, which are set.
     // 1. Disable the UART.
     // FIXME: Do we need to disable the tx and rx bits as well?
-    REG(g_uartBase.value + CTL_REG_OFFSET) &= ~CTL_UARTEN;
+    UART0_CTL_R &= ~CTL_UARTEN;
     // 2. Wait for the end of transmission or reception of the current character.
     // FIXME: This might not check for reception?
     //        Maybe fix: "When the receiver is idle (the UnRx signal is continuously 1)"
-    while ((REG(g_uartBase.value + FLAG_REG_OFFSET) & FLAG_BUSY) != 0)
+    while ((UART0_FR_R & FLAG_BUSY) != 0)
     {
     }
     // 3. Flush the transmit FIFO by clearing bit 4 (FEN) in the line control register (UARTLCRH).
-    REG(g_uartBase.value + LINE_CONTROL_REG_OFFSET) &= ~LINE_CONTROL_FEN;
+    UART0_LCRH_R &= ~LINE_CONTROL_FEN;
     // FIXME: Maybe we need to wait a bit before re-enabling? Maybe we don't need to re-enable at all?
-    REG(g_uartBase.value + LINE_CONTROL_REG_OFFSET) |= LINE_CONTROL_FEN;
+    UART0_LCRH_R |= LINE_CONTROL_FEN;
 
     // 4. Reset interrupt bits.
-    // FIXME: Make sure that the GPIO base is what should be used here.
-    REG(g_gpioBase.value + INT_CLEAR_REG_OFFSET) = ~0U;
+    // FIXME: Should the gpio interrupts be cleared as well?
+    GPIO_PORTA_AHB_ICR_R = ~0U;
+    UART0_ICR_R = ~0U;
 
     // 5. Enable the UART
-    REG(g_uartBase.value + CTL_REG_OFFSET) |= CTL_UARTEN;
-
-
+    UART0_CTL_R |= CTL_UARTEN;
 
     // FIXME: In spec, the program should error when trying to read string after resetting without initing.
     //        Seems like the UART should be reset?

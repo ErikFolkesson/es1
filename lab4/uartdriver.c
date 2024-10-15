@@ -264,14 +264,10 @@ void UART_reset(void)
 // FIXME: The lab spec doesn't show the arguments for this function, but this seems like the only logical one?
 void UART_putString(const char *string)
 {
-    // Get the length of the string.
-    uint16_t len = sizeof(string) / sizeof(string[0]);
-    uint16_t i;
-
-    // Loop through the string, sending each char to UART_putChar()
-    for (i = 0; i < len; i++)
+    // Loop through the string until we find the null character, sending each char to UART_putChar()
+    for (const char *it = string; *it != '\0'; it++)
     {
-        UART_putChar(string[i]);
+        UART_putChar(*it);
     }
 }
 

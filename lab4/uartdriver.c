@@ -100,7 +100,7 @@
 
 #define BAUDCLOCK 16000000U
 #define BAUDRATE 9600U
-#define CLKDIV 8U // FIXME: might be 16
+#define CLKDIV 16U // FIXME: might be 16
 // FIXME: They do the calculation differently in UARTConfigSetExpClk
 #define BRD ((double) BAUDCLOCK / (CLKDIV * BAUDRATE))
 #define BRDINT ((uint32_t) BRD)
@@ -132,15 +132,13 @@ void UART_init(uint32_t uartBase)
     // 1. Reset the driver to avoid unpredictable behavior during initialization.
     // FIXME: Do we need to reset or not?
     // UART_reset();
+
     g_uartBase.value = UART0_BASE;
     g_gpioBase.value = GPIO_PORT_A_BASE;
 
     //     1.1 Enable UART module using RCGCUART register (page 395)
     RCGCUART_REG = SYSCTL_RCGCUART_R0;
     //     1.2 Enable clock to appropriate GPIO module via RCGCGPIO register (page 389). GPIO port enabling info in table 29-5 (page 1932).
-
-    //         Set clock source
-    UART0_CC_R = PIOSC_VALUE;
     RCGCGPIO_REG = SYSCTL_RCGCGPIO_R0;
     //     1.3 Set GPIO AFSEL bits for appropriate pins (page 778). To determine GPIOs to configure, see table 29-4 (page 1921)
     GPIO_PORTA_AHB_AFSEL_R |= GPIO_PIN_0 | GPIO_PIN_1;
@@ -150,10 +148,9 @@ void UART_init(uint32_t uartBase)
 
     //     1.5 Configure PMCn fields in GPIOPCTL register to assign UART signals to appropriate pins (page 795, table 29-5 page 1932).
     // FIXME: Need to write a 1 to all parts of the register that correspond to the pins we use. Can probably use loop over bits and do 1 << (i * 4). For now we hard code.
-    GPIO_PORTA_AHB_PCTL_R |= 17U; // 4th and 0th bit set.
+    GPIO_PORTA_AHB_PCTL_R |= 0x11U; // 4th and 0th bit set.
 
     // What is done in SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOA):
-
     // What is done in SysCtlPeripheralEnable(SYSCTL_PERIPH_UART0).
     // What is done in GPIOPinConfigure(GPIO_PA0_U0RX).
     // What is done in GPIOPinConfigure(GPIO_PA1_U0TX).
@@ -172,11 +169,22 @@ void UART_init(uint32_t uartBase)
     // 2. Set the baud rate.
     // FIXME: "This internal register [UARTLCRH] is only updated when a write operation to UARTLCRH is performed, so any changes to the baud-rate divisor must be followed by a write to the UARTLCRH register for the changes to take effect."
     // FIXME: We try disabling UART before writing this????
-    UART0_FBRD_R = BRDFRAC;
+    UART0_CTL_R &= ~CTL_UARTEN;
     UART0_IBRD_R = BRDINT;
+    UART0_FBRD_R = BRDFRAC;
     // 3. Set the message length.
     // Parity bit set to 0 disables and stop bit set to 0 uses one stop bit, so those are implicitly the correct values.
-    UART0_LCRH_R |= LINE_CONTROL_MSG_LEN | UART_LCRH_FEN;
+    // FIXME: Maybe we don't want to use FIFOs? The example in the data sheet doesn't.
+    //UART0_LCRH_R |= LINE_CONTROL_MSG_LEN | UART_LCRH_FEN; // With FIFO enabled.
+    UART0_LCRH_R |= LINE_CONTROL_MSG_LEN;
+
+    // Set clock source
+    UART0_CC_R = PIOSC_VALUE;
+
+    // FIXME: Might have to enable piosc and stuff in sysctl?? The write doesn't seem to affect the register currently.
+    // Default calibration: clear the UTEN bit and set the UPDATE bit in the Precision Internal Oscillator Calibration (PIOSCCAL) register.
+    SYSCTL_PIOSCCAL_R |= SYSCTL_PIOSCCAL_UPDATE;
+
     // 5. Set the driver to normal mode.
     // FIXME: It seems like it might be normal mode by default?
 

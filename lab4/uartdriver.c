@@ -271,14 +271,14 @@ void UART_putString(const char *string)
     }
 }
 
-// FIXME: The lab spec doesn't show the arguments for this function. I assume this is what they want?
+// FIXME: The lab spec doesn't show the arguments for this function. I assume this is what they want? Ideally this would also return the # of characters read.
 void UART_getString(char *buf, uint32_t bufSize)
 {
     uint16_t i;
 
     // Keep reading characters until the entire buffer is full
     // or until we get a newline character.
-    for (i = 0; i < bufSize; i++)
+    for (i = 0; i < bufSize - 1; i++)
     {
         char c = UART_getChar();
         if (c == '\n')
@@ -288,4 +288,5 @@ void UART_getString(char *buf, uint32_t bufSize)
         }
         buf[i] = c;
     }
+    buf[i] = '\0'; // Make sure we terminate the written string.
 }

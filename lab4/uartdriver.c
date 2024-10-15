@@ -229,8 +229,6 @@ void UART_reset(void)
 {
     // FIXME: Figure out what to actually do here.
 
-
-
     // Reset both UART and GPIO modules
 
     // The UARTCTL register is the control register.
@@ -271,7 +269,8 @@ void UART_putString(const char *string)
     uint16_t i;
 
     // Loop through the string, sending each char to UART_putChar()
-    for (i = 0; i < len; i++) {
+    for (i = 0; i < len; i++)
+    {
         UART_putChar(string[i]);
     }
 }
@@ -283,9 +282,11 @@ void UART_getString(char *buf, uint32_t bufSize)
 
     // Keep reading characters until the entire buffer is full
     // or until we get a newline character.
-    for (i = 0; i < bufSize; i++) {
+    for (i = 0; i < bufSize; i++)
+    {
         char c = UART_getChar();
-        if (c == '\n') {
+        if (c == '\n')
+        {
             // We have got a newline character, terminate
             break;
         }

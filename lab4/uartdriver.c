@@ -105,18 +105,7 @@
 #define BRDINT ((uint32_t) BRD)
 #define BRDFRAC ((uint32_t) ((BRD - BRDINT) * 64 + 0.5))
 
-typedef struct
-{
-    uint32_t value;
-} UartBase;
-
-typedef struct
-{
-    uint32_t value;
-} GpioBase;
-
-static UartBase g_uartBase;
-static GpioBase g_gpioBase;
+static bool g_initialized;
 
 // FIXME: If we are supposed to only support UART0, why do we receive uartBase here??
 void UART_init(void)
@@ -131,8 +120,6 @@ void UART_init(void)
     // 1. Reset the driver to avoid unpredictable behavior during initialization.
     // FIXME: Do we need to reset or not?
     // UART_reset();
-    g_uartBase.value = UART0_BASE;
-    g_gpioBase.value = GPIO_PORT_A_BASE;
 
     //     1.1 Enable UART module using RCGCUART register (page 395)
     RCGCUART_REG = SYSCTL_RCGCUART_R0;
@@ -162,13 +149,15 @@ void UART_init(void)
 
     // 7. Enable the digital register bit for the GPIO pins.
     GPIO_PORTA_AHB_DEN_R = 0x3;
+
+    g_initialized = true;
 }
 
 char UART_getChar(void)
 {
     // Make sure the driver has been initialized before accessing the hardware.
     // Do this by checking that we have a non-zero base
-    assert(g_uartBase.value != 0);
+    assert(g_initialized);
 
     // Wait until the receive FIFO is not empty
     while (UART0_FR_R & FLAG_RXFE)
@@ -183,7 +172,7 @@ void UART_putChar(char c)
 {
     // Make sure the driver has been initialized before accessing the hardware.
     // Do this by checking that we have a non-zero base
-    assert(g_uartBase.value != 0);
+    assert(g_initialized);
 
     // Wait until transmit FIFO no longer is full
     while (UART0_FR_R & FLAG_TXFF)
@@ -227,8 +216,7 @@ void UART_reset(void)
 
     // FIXME: In spec, the program should error when trying to read string after resetting without initing.
     //        Seems like the UART should be reset?
-    g_uartBase.value = 0;
-    g_gpioBase.value = 0;
+    g_initialized = false;
 }
 
 // FIXME: The lab spec doesn't show the arguments for this function, but this seems like the only logical one?

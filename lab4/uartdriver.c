@@ -48,39 +48,37 @@ void UART_init(void)
     // The driver should send one stop bit.
     // The driver should operate in normal channel mode.
 
-    // Steps to do in initialization:
-    // 1. Reset the driver to avoid unpredictable behavior during initialization.
-    // FIXME: Do we need to reset or not?
+    // Start from a clean state.
     // UART_reset();
 
-    //     1.1 Enable UART module using RCGCUART register (page 395)
-    RCGCUART_REG = SYSCTL_RCGCUART_R0;
-    //     1.2 Enable clock to appropriate GPIO module via RCGCGPIO register (page 389). GPIO port enabling info in table 29-5 (page 1932).
-    RCGCGPIO_REG = SYSCTL_RCGCGPIO_R0;
-    UART0_CC_R = PIOSC_VALUE;
-    //     1.3 Set GPIO AFSEL bits for appropriate pins (page 778). To determine GPIOs to configure, see table 29-4 (page 1921)
-    GPIO_PORTA_AHB_AFSEL_R |= GPIO_PIN_0 | GPIO_PIN_1;
-    //     1.4 Configure GPIO current level and/or slew rate as specified for mode selected (page 780 and 788).
+    // Enable the UART module.
+    RCGCUART_REG = SYSCTL_RCGCUART_R0; // "There must be a delay of 3 system clocks after the UART module clock is enabled before any UART module registers are accessed."
 
-    //     1.5 Configure PMCn fields in GPIOPCTL register to assign UART signals to appropriate pins (page 795, table 29-5 page 1932).
+    // Enable the GPIO module clock.
+    RCGCGPIO_REG = SYSCTL_RCGCGPIO_R0; // "There must be a delay of 3 system clocks after the GPIO module clock is enabled before any GPIO module registers are accessed."
+
+    // Set the UART clock to be PIOSC.
+    UART0_CC_R = PIOSC_VALUE;
+
+    // Set GPIO pins 0 and 1 to be AFSEL (Alternate Function Select).
+    GPIO_PORTA_AHB_AFSEL_R |= GPIO_PIN_0 | GPIO_PIN_1;
+
+    // Assign the GPIO pins to UART functionality.
     GPIO_PORTA_AHB_PCTL_R |= 17U; // 4th and 0th bit set.
 
-    // 2. Set the baud rate.
+    // Set the baud rate.
     UART0_FBRD_R = BRDFRAC;
     UART0_IBRD_R = BRDINT;
 
-    // 3. Set the message length.
-    // Parity bit set to 0 disables and stop bit set to 0 uses one stop bit, so those are implicitly the correct values.
-    UART0_LCRH_R |= LINE_CONTROL_MSG_LEN | UART_LCRH_FEN;
+    // Set the message length.
+    // By default, the parity is disabled and one stop bit is used, so we don't explicitly set them.
+    UART0_LCRH_R |= LINE_CONTROL_MSG_LEN;
 
-    // 5. Set the driver to normal mode.
-
-    // 6. Enable the communication.
-    // Enable UART and tx/rx.
-    UART0_CTL_R |= CTL_UARTEN | CTL_UART_TX_EN | CTL_UART_RX_EN;
-
-    // 7. Enable the digital register bit for the GPIO pins.
+    // Enable the digital register bit for the GPIO pins.
     GPIO_PORTA_AHB_DEN_R = 0x3;
+
+    // Enable UART.
+    UART0_CTL_R |= CTL_UARTEN;
 
     g_initialized = true;
 }

@@ -101,7 +101,6 @@
 #define BAUDCLOCK 16000000U
 #define BAUDRATE 9600U
 #define CLKDIV 16U
-// FIXME: They do the calculation differently in UARTConfigSetExpClk
 #define BRD ((double) BAUDCLOCK / (CLKDIV * BAUDRATE))
 #define BRDINT ((uint32_t) BRD)
 #define BRDFRAC ((uint32_t) ((BRD - BRDINT) * 64 + 0.5))
@@ -138,60 +137,31 @@ void UART_init(uint32_t uartBase)
     //     1.1 Enable UART module using RCGCUART register (page 395)
     RCGCUART_REG = SYSCTL_RCGCUART_R0;
     //     1.2 Enable clock to appropriate GPIO module via RCGCGPIO register (page 389). GPIO port enabling info in table 29-5 (page 1932).
-
-    //         Set clock source
     RCGCGPIO_REG = SYSCTL_RCGCGPIO_R0;
     UART0_CC_R = PIOSC_VALUE;
     //     1.3 Set GPIO AFSEL bits for appropriate pins (page 778). To determine GPIOs to configure, see table 29-4 (page 1921)
     GPIO_PORTA_AHB_AFSEL_R |= GPIO_PIN_0 | GPIO_PIN_1;
     //     1.4 Configure GPIO current level and/or slew rate as specified for mode selected (page 780 and 788).
-    // FIXME: Set to 2mA (GPIODR2R), offset 0x500 (Is already set by default)
-    // Set slew rate: FIXME: (According to data sheet 2mA doesn't need to?)
 
     //     1.5 Configure PMCn fields in GPIOPCTL register to assign UART signals to appropriate pins (page 795, table 29-5 page 1932).
-    // FIXME: Need to write a 1 to all parts of the register that correspond to the pins we use. Can probably use loop over bits and do 1 << (i * 4). For now we hard code.
     GPIO_PORTA_AHB_PCTL_R |= 17U; // 4th and 0th bit set.
 
-    // What is done in SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOA):
-
-    // What is done in SysCtlPeripheralEnable(SYSCTL_PERIPH_UART0).
-    // What is done in GPIOPinConfigure(GPIO_PA0_U0RX).
-    // What is done in GPIOPinConfigure(GPIO_PA1_U0TX).
-    // What is done in GPIOPinTypeUART(GPIO_PORTA_BASE, GPIO_PIN_0 | GPIO_PIN_1):
-    //   GPIODirModeSet(port, pins, GPIO_DIR_MODE_HW)
-    //     Sets the pin direction as input (since UART takes care of it?) (it should be defaulted to input. FIXME: Should we still set it to input manually? Probably, in case the user used the pin previously?)
-    //     Sets the pin modes to be their alternate functions (we've already taken care of it).
-    //   GPIOPadConfigSet(port, pins, GPIO_STRENGTH_2MA, GPIO_PIN_TYPE_STD)
-    //     Sets the GPIO peripheral configuration register
-    //     Sets the output drive strength to 2mA and sets slew rate (writes to DR2R, DR4R, DR8R, and SLR registers)
-    //     Sets the DR12R register FIXME: This register doesn't show in the data sheet.
-    //     Sets the pin type (registers ODR, PUR, PDR, DEN)
-    //     Sets the WAKELVL and WAKEPEN registers.
-    //     Sets the AMSEL register.
-
     // 2. Set the baud rate.
-    // FIXME: "This internal register [UARTLCRH] is only updated when a write operation to UARTLCRH is performed, so any changes to the baud-rate divisor must be followed by a write to the UARTLCRH register for the changes to take effect."
-    // FIXME: We try disabling UART before writing this????
     UART0_FBRD_R = BRDFRAC;
     UART0_IBRD_R = BRDINT;
+
     // 3. Set the message length.
     // Parity bit set to 0 disables and stop bit set to 0 uses one stop bit, so those are implicitly the correct values.
     UART0_LCRH_R |= LINE_CONTROL_MSG_LEN | UART_LCRH_FEN;
+
     // 5. Set the driver to normal mode.
-    // FIXME: It seems like it might be normal mode by default?
 
     // 6. Enable the communication.
     // Enable UART and tx/rx.
-    // FIXME: Break error and framing error occurs due to this.
     UART0_CTL_R |= CTL_UARTEN | CTL_UART_TX_EN | CTL_UART_RX_EN;
 
     // 7. Enable the digital register bit for the GPIO pins.
-    // FIXME: Do we need to do something to open drain, pull up, and pull down?
-    // FIXME: Is this done in steps 1.2/1.3?
-    // FIXME: Don't hard code if we need to handle multiple ports.
     GPIO_PORTA_AHB_DEN_R = 0x3;
-
-    // Check specification for more details.
 }
 
 char UART_getChar(void)

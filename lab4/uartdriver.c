@@ -140,8 +140,8 @@ void UART_init(uint32_t uartBase)
     //     1.2 Enable clock to appropriate GPIO module via RCGCGPIO register (page 389). GPIO port enabling info in table 29-5 (page 1932).
 
     //         Set clock source
-    UART0_CC_R = PIOSC_VALUE;
     RCGCGPIO_REG = SYSCTL_RCGCGPIO_R0;
+    UART0_CC_R = PIOSC_VALUE;
     //     1.3 Set GPIO AFSEL bits for appropriate pins (page 778). To determine GPIOs to configure, see table 29-4 (page 1921)
     GPIO_PORTA_AHB_AFSEL_R |= GPIO_PIN_0 | GPIO_PIN_1;
     //     1.4 Configure GPIO current level and/or slew rate as specified for mode selected (page 780 and 788).

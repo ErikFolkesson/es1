@@ -49,7 +49,7 @@ void UART_init(void)
     // The driver should operate in normal channel mode.
 
     // Start from a clean state.
-    // UART_reset();
+    UART_reset();
 
     // Enable the UART module.
     RCGCUART_REG = SYSCTL_RCGCUART_R0; // "There must be a delay of 3 system clocks after the UART module clock is enabled before any UART module registers are accessed."
@@ -116,36 +116,48 @@ void UART_putChar(char c)
 
 void UART_reset(void)
 {
-    // FIXME: Figure out what to actually do here.
+    // We don't attempt the reset if we haven't yet initialized (Accessing some of the registers is illegal without initialization).
+    if (!g_initialized) {
+        return;
+    }
 
-    // Reset both UART and GPIO modules
-
-    // The UARTCTL register is the control register.
-    // All the bits are cleared on reset except for the Transmit Enable (TXE) and Receive Enable (RXE) bits, which are set.
-    // 1. Disable the UART.
-    // FIXME: Do we need to disable the tx and rx bits as well?
-    UART0_CTL_R &= ~CTL_UARTEN;
-    // 2. Wait for the end of transmission or reception of the current character.
-    // FIXME: This might not check for reception?
-    //        Maybe fix: "When the receiver is idle (the UnRx signal is continuously 1)"
+    // Wait for current transmission to finish.
     while ((UART0_FR_R & FLAG_BUSY) != 0)
     {
     }
-    // 3. Flush the transmit FIFO by clearing bit 4 (FEN) in the line control register (UARTLCRH).
-    UART0_LCRH_R &= ~LINE_CONTROL_FEN;
-    // FIXME: Maybe we need to wait a bit before re-enabling? Maybe we don't need to re-enable at all?
-    UART0_LCRH_R |= LINE_CONTROL_FEN;
 
-    // 4. Reset interrupt bits.
-    // FIXME: Should the gpio interrupts be cleared as well?
+    // Disable UART.
+    UART0_CTL_R &= ~CTL_UARTEN;
+
+    // Disable digital enable for the GPIO pins.
+    GPIO_PORTA_AHB_DEN_R = ~0x3;
+
+    // Clear the message length.
+    UART0_LCRH_R &= ~LINE_CONTROL_MSG_LEN;
+
+    // Clear the baud rate.
+    UART0_FBRD_R = 0;
+    UART0_IBRD_R = 0;
+
+    // Unassign UART signals for the GPIO pins.
+    GPIO_PORTA_AHB_PCTL_R &= ~17U; // 4th and 0th bit set.
+
+    // Unset GPIO AFSEL for the pins.
+    GPIO_PORTA_AHB_AFSEL_R &= ~(GPIO_PIN_0 | GPIO_PIN_1);
+
+    // Clear interrupts.
     GPIO_PORTA_AHB_ICR_R = ~0U;
     UART0_ICR_R = ~0U;
 
-    // 5. Enable the UART
-    UART0_CTL_R |= CTL_UARTEN;
+    // Unset PIOSC as the UART clock.
+    UART0_CC_R &= ~PIOSC_VALUE;
 
-    // FIXME: In spec, the program should error when trying to read string after resetting without initing.
-    //        Seems like the UART should be reset?
+    // Disable the GPIO module.
+    RCGCGPIO_REG &= ~SYSCTL_RCGCGPIO_R0;
+
+    // Disable the UART module.
+    RCGCUART_REG &= ~SYSCTL_RCGCUART_R0;
+
     g_initialized = false;
 }
 

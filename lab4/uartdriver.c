@@ -100,7 +100,7 @@
 
 #define BAUDCLOCK 16000000U
 #define BAUDRATE 9600U
-#define CLKDIV 8U // FIXME: might be 16
+#define CLKDIV 16U
 // FIXME: They do the calculation differently in UARTConfigSetExpClk
 #define BRD ((double) BAUDCLOCK / (CLKDIV * BAUDRATE))
 #define BRDINT ((uint32_t) BRD)

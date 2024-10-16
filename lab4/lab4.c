@@ -14,7 +14,7 @@ char buf[BUF_SIZE];
 int main(void)
 {
     // UART_reset();
-    UART_init(UART0_BASE);
+    UART_init();
     UART_putChar('a');
     while (true)
     {

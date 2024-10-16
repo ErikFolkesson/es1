@@ -3,7 +3,7 @@
 
 #include <stdint.h>
 
-void UART_init(uint32_t base);
+void UART_init(void);
 char UART_getChar(void);
 void UART_putChar(char c);
 void UART_reset(void);

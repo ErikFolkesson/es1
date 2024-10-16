@@ -119,7 +119,7 @@ static UartBase g_uartBase;
 static GpioBase g_gpioBase;
 
 // FIXME: If we are supposed to only support UART0, why do we receive uartBase here??
-void UART_init(uint32_t uartBase)
+void UART_init(void)
 {
     // The driver should operate at 9600 baud.
     // The packet length should be 8 bits.

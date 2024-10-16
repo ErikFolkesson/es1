@@ -8,64 +8,6 @@
 #include <assert.h>
 #include <stdbool.h>
 
-// FIXME: These are taken from inc/tm4c129encpdt.h. They are only here to collect the macros we might need in one place. They can be removed once we're done.
-#define UART0_DR_R              (*((volatile uint32_t *)0x4000C000))
-#define UART0_RSR_R             (*((volatile uint32_t *)0x4000C004))
-#define UART0_ECR_R             (*((volatile uint32_t *)0x4000C004))
-#define UART0_FR_R              (*((volatile uint32_t *)0x4000C018))
-#define UART0_ILPR_R            (*((volatile uint32_t *)0x4000C020))
-#define UART0_IBRD_R            (*((volatile uint32_t *)0x4000C024))
-#define UART0_FBRD_R            (*((volatile uint32_t *)0x4000C028))
-#define UART0_LCRH_R            (*((volatile uint32_t *)0x4000C02C))
-#define UART0_CTL_R             (*((volatile uint32_t *)0x4000C030))
-#define UART0_IFLS_R            (*((volatile uint32_t *)0x4000C034))
-#define UART0_IM_R              (*((volatile uint32_t *)0x4000C038))
-#define UART0_RIS_R             (*((volatile uint32_t *)0x4000C03C))
-#define UART0_MIS_R             (*((volatile uint32_t *)0x4000C040))
-#define UART0_ICR_R             (*((volatile uint32_t *)0x4000C044))
-#define UART0_DMACTL_R          (*((volatile uint32_t *)0x4000C048))
-#define UART0_9BITADDR_R        (*((volatile uint32_t *)0x4000C0A4))
-#define UART0_9BITAMASK_R       (*((volatile uint32_t *)0x4000C0A8))
-#define UART0_PP_R              (*((volatile uint32_t *)0x4000CFC0))
-#define UART0_CC_R              (*((volatile uint32_t *)0x4000CFC8))
-
-#define GPIO_PORTA_AHB_DATA_BITS_R                                             \
-                                ((volatile uint32_t *)0x40058000) // FIXME: This doesn't dereference?? I assume we probably don't need to read from it since we use the UART data register instead, so probably fine?
-#define GPIO_PORTA_AHB_DATA_R   (*((volatile uint32_t *)0x400583FC))
-#define GPIO_PORTA_AHB_DIR_R    (*((volatile uint32_t *)0x40058400))
-#define GPIO_PORTA_AHB_IS_R     (*((volatile uint32_t *)0x40058404))
-#define GPIO_PORTA_AHB_IBE_R    (*((volatile uint32_t *)0x40058408))
-#define GPIO_PORTA_AHB_IEV_R    (*((volatile uint32_t *)0x4005840C))
-#define GPIO_PORTA_AHB_IM_R     (*((volatile uint32_t *)0x40058410))
-#define GPIO_PORTA_AHB_RIS_R    (*((volatile uint32_t *)0x40058414))
-#define GPIO_PORTA_AHB_MIS_R    (*((volatile uint32_t *)0x40058418))
-#define GPIO_PORTA_AHB_ICR_R    (*((volatile uint32_t *)0x4005841C))
-#define GPIO_PORTA_AHB_AFSEL_R  (*((volatile uint32_t *)0x40058420))
-#define GPIO_PORTA_AHB_DR2R_R   (*((volatile uint32_t *)0x40058500))
-#define GPIO_PORTA_AHB_DR4R_R   (*((volatile uint32_t *)0x40058504))
-#define GPIO_PORTA_AHB_DR8R_R   (*((volatile uint32_t *)0x40058508))
-#define GPIO_PORTA_AHB_ODR_R    (*((volatile uint32_t *)0x4005850C))
-#define GPIO_PORTA_AHB_PUR_R    (*((volatile uint32_t *)0x40058510))
-#define GPIO_PORTA_AHB_PDR_R    (*((volatile uint32_t *)0x40058514))
-#define GPIO_PORTA_AHB_SLR_R    (*((volatile uint32_t *)0x40058518))
-#define GPIO_PORTA_AHB_DEN_R    (*((volatile uint32_t *)0x4005851C))
-#define GPIO_PORTA_AHB_LOCK_R   (*((volatile uint32_t *)0x40058520))
-#define GPIO_PORTA_AHB_CR_R     (*((volatile uint32_t *)0x40058524))
-#define GPIO_PORTA_AHB_AMSEL_R  (*((volatile uint32_t *)0x40058528))
-#define GPIO_PORTA_AHB_PCTL_R   (*((volatile uint32_t *)0x4005852C))
-#define GPIO_PORTA_AHB_ADCCTL_R (*((volatile uint32_t *)0x40058530))
-#define GPIO_PORTA_AHB_DMACTL_R (*((volatile uint32_t *)0x40058534))
-#define GPIO_PORTA_AHB_SI_R     (*((volatile uint32_t *)0x40058538))
-#define GPIO_PORTA_AHB_DR12R_R  (*((volatile uint32_t *)0x4005853C))
-#define GPIO_PORTA_AHB_WAKEPEN_R                                              \
-                                (*((volatile uint32_t *)0x40058540))
-#define GPIO_PORTA_AHB_WAKELVL_R                                              \
-                                (*((volatile uint32_t *)0x40058544))
-#define GPIO_PORTA_AHB_WAKESTAT_R                                             \
-                                (*((volatile uint32_t *)0x40058548))
-#define GPIO_PORTA_AHB_PP_R     (*((volatile uint32_t *)0x40058FC0))
-#define GPIO_PORTA_AHB_PC_R     (*((volatile uint32_t *)0x40058FC4))
-
 #define RCGCUART_REG SYSCTL_RCGCUART_R
 #define RCGCGPIO_REG SYSCTL_RCGCGPIO_R
 
@@ -74,9 +16,6 @@
 // Line control bits.
 #define LINE_CONTROL_FEN UART_LCRH_FEN // Enable/disable FIFO
 #define LINE_CONTROL_MSG_LEN UART_LCRH_WLEN_8
-
-// RCGCUART bits.
-//SYSCTL_RCGCUART_R0
 
 // CTL bits.
 #define CTL_UARTEN UART_CTL_UARTEN
@@ -87,13 +26,6 @@
 #define FLAG_BUSY UART_FR_BUSY
 #define FLAG_RXFE UART_FR_RXFE // Receive FIFO empty
 #define FLAG_TXFF UART_FR_TXFF // Transmit FIFO full
-
-// FIXME: Figure out if this is allowed/if we want to do it another way.
-#define UART0_BASE              0x4000C000
-
-#define REG(n) (*((volatile uint32_t*) (n)))
-
-#define GPIO_PORT_A_BASE 0x40058000U
 
 #define GPIO_PIN_0 (1U << 0U)
 #define GPIO_PIN_1 (1U << 1U)

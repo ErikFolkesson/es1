@@ -8,25 +8,6 @@
 #include <assert.h>
 #include <stdbool.h>
 
-#define RCGCUART_REG SYSCTL_RCGCUART_R
-#define RCGCGPIO_REG SYSCTL_RCGCGPIO_R
-
-#define PIOSC_VALUE UART_CC_CS_PIOSC
-
-// Line control bits.
-#define LINE_CONTROL_FEN UART_LCRH_FEN // Enable/disable FIFO
-#define LINE_CONTROL_MSG_LEN UART_LCRH_WLEN_8
-
-// CTL bits.
-#define CTL_UARTEN UART_CTL_UARTEN
-#define CTL_UART_TX_EN UART_CTL_TXE
-#define CTL_UART_RX_EN UART_CTL_RXE
-
-// FLAG bits.
-#define FLAG_BUSY UART_FR_BUSY
-#define FLAG_RXFE UART_FR_RXFE // Receive FIFO empty
-#define FLAG_TXFF UART_FR_TXFF // Transmit FIFO full
-
 #define GPIO_PIN_0 (1U << 0U)
 #define GPIO_PIN_1 (1U << 1U)
 
@@ -52,13 +33,13 @@ void UART_init(void)
     UART_reset();
 
     // Enable the UART module.
-    RCGCUART_REG = SYSCTL_RCGCUART_R0; // "There must be a delay of 3 system clocks after the UART module clock is enabled before any UART module registers are accessed."
+    SYSCTL_RCGCUART_R = SYSCTL_RCGCUART_R0; // "There must be a delay of 3 system clocks after the UART module clock is enabled before any UART module registers are accessed."
 
     // Enable the GPIO module clock.
-    RCGCGPIO_REG = SYSCTL_RCGCGPIO_R0; // "There must be a delay of 3 system clocks after the GPIO module clock is enabled before any GPIO module registers are accessed."
+    SYSCTL_RCGCGPIO_R = SYSCTL_RCGCGPIO_R0; // "There must be a delay of 3 system clocks after the GPIO module clock is enabled before any GPIO module registers are accessed."
 
     // Set the UART clock to be PIOSC.
-    UART0_CC_R = PIOSC_VALUE;
+    UART0_CC_R = UART_CC_CS_PIOSC;
 
     // Set GPIO pins 0 and 1 to be AFSEL (Alternate Function Select).
     GPIO_PORTA_AHB_AFSEL_R |= GPIO_PIN_0 | GPIO_PIN_1;
@@ -72,13 +53,13 @@ void UART_init(void)
 
     // Set the message length.
     // By default, the parity is disabled and one stop bit is used, so we don't explicitly set them.
-    UART0_LCRH_R |= LINE_CONTROL_MSG_LEN;
+    UART0_LCRH_R |= UART_LCRH_WLEN_8;
 
     // Enable the digital register bit for the GPIO pins.
     GPIO_PORTA_AHB_DEN_R = 0x3;
 
     // Enable UART.
-    UART0_CTL_R |= CTL_UARTEN;
+    UART0_CTL_R |= UART_CTL_UARTEN;
 
     g_initialized = true;
 }
@@ -90,7 +71,7 @@ char UART_getChar(void)
     assert(g_initialized);
 
     // Wait until the receive FIFO is not empty
-    while (UART0_FR_R & FLAG_RXFE)
+    while (UART0_FR_R & UART_FR_RXFE)
     {
     }
 
@@ -105,7 +86,7 @@ void UART_putChar(char c)
     assert(g_initialized);
 
     // Wait until transmit FIFO no longer is full
-    while (UART0_FR_R & FLAG_TXFF)
+    while (UART0_FR_R & UART_FR_TXFF)
     {
     }
 
@@ -122,18 +103,18 @@ void UART_reset(void)
     }
 
     // Wait for current transmission to finish.
-    while ((UART0_FR_R & FLAG_BUSY) != 0)
+    while ((UART0_FR_R & UART_FR_BUSY) != 0)
     {
     }
 
     // Disable UART.
-    UART0_CTL_R &= ~CTL_UARTEN;
+    UART0_CTL_R &= ~UART_CTL_UARTEN;
 
     // Disable digital enable for the GPIO pins.
     GPIO_PORTA_AHB_DEN_R = ~0x3;
 
     // Clear the message length.
-    UART0_LCRH_R &= ~LINE_CONTROL_MSG_LEN;
+    UART0_LCRH_R &= ~UART_LCRH_WLEN_8;
 
     // Clear the baud rate.
     UART0_FBRD_R = 0;
@@ -150,13 +131,13 @@ void UART_reset(void)
     UART0_ICR_R = ~0U;
 
     // Unset PIOSC as the UART clock.
-    UART0_CC_R &= ~PIOSC_VALUE;
+    UART0_CC_R &= ~UART_CC_CS_PIOSC;
 
     // Disable the GPIO module.
-    RCGCGPIO_REG &= ~SYSCTL_RCGCGPIO_R0;
+    SYSCTL_RCGCGPIO_R &= ~SYSCTL_RCGCGPIO_R0;
 
     // Disable the UART module.
-    RCGCUART_REG &= ~SYSCTL_RCGCUART_R0;
+    SYSCTL_RCGCUART_R &= ~SYSCTL_RCGCUART_R0;
 
     g_initialized = false;
 }

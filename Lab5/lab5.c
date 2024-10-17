@@ -2,6 +2,7 @@
 #include "task.h"
 #include "semphr.h"
 
+#include <assert.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -72,7 +73,12 @@ int main(void)
     // Set the direction as output, and
     // enable the GPIO pin for digital function.
     GPIOPinTypeGPIOOutput(GPIO_PORTN_BASE,
-                          GPIO_PIN_0 | GPIO_PIN_1 | GPIO_PIN_2 | GPIO_PIN_3);
+    GPIO_PIN_0 | GPIO_PIN_1 | GPIO_PIN_2 | GPIO_PIN_3);
+
+    // FIXME: These could be defines? Potentially enums.
+    const uint16_t taskStackDepth = 1000; // FIXME: Figure out good stack depth. (shouldn't need to be large?)
+    const UBaseType_t blinkTaskPrio = tskIDLE_PRIORITY + 2;
+    const UBaseType_t holdTaskPrio = tskIDLE_PRIORITY + 1;
 
     // Construct task arguments as static variables to make sure they outlive the tasks.
     static TaskBlinkArgs blink1Args;
@@ -99,22 +105,43 @@ int main(void)
                                           &button_sem_2,
                                   .ledId = CLP_D2 };
 
-    // Create tasks
-    // CLP_D1, CLP_D2, CLP_D3, CLP_D4
-    // FixME: Should use xTaskCreate instead.
-    blink_LED_1 = vTaskBlink(CLP_D1, 1000, LED_mutex_1);
-    blink_LED_2 = vTaskBlink(CLP_D2, 2000, LED_mutex_2);
-    blink_LED_3 = vTaskBlink(CLP_D3, 3000, null);
-    blink_LED_4 = vTaskBlink(CLP_D4, 4000, null);
+    // FIXME: Might not need the handles?
+    TaskHandle_t blink1Task;
+    BaseType_t result = xTaskCreate(vTaskBlink, "BlinkLed1", taskStackDepth,
+                                    &blink1Args, blinkTaskPrio, &blink1Task);
+    assert(result == pdPASS);
+    // FIXME: In the example used in the xTaskCreate doc comment, they use configASSERT(taskHandle). Figure out what that actually does.
 
-    // FixME: Placeholder
-    hold_LED_1 = vTaskHold(CLP_D1);
-    hold_LED_2 = vTaskHold(CLP_D2);
+    TaskHandle_t blink2Task;
+    result = xTaskCreate(vTaskBlink, "BlinkLed2", taskStackDepth, &blink2Args,
+                         blinkTaskPrio, &blink2Task);
+    assert(result == pdPASS);
+
+    TaskHandle_t blink3Task;
+    result = xTaskCreate(vTaskBlink, "BlinkLed3", taskStackDepth, &blink3Args,
+                         blinkTaskPrio, &blink3Task);
+    assert(result == pdPASS);
+
+    TaskHandle_t blink4Task;
+    result = xTaskCreate(vTaskBlink, "BlinkLed4", taskStackDepth, &blink4Args,
+                         blinkTaskPrio, &blink4Task);
+    assert(result == pdPASS);
+
+    TaskHandle_t hold1Task;
+    result = xTaskCreate(vTaskHold, "HoldLed1", taskStackDepth, &hold1Args,
+                         holdTaskPrio, &hold1Task);
+    assert(result == pdPASS);
+
+    TaskHandle_t hold2Task;
+    result = xTaskCreate(vTaskHold, "HoldLed2", taskStackDepth, &hold2Args,
+                         holdTaskPrio, &hold2Task);
+    assert(result == pdPASS);
 
     // Start the scheduler with vTaskStartScheduler
+    vTaskStartScheduler();
 
-
-    while(true) {
+    while (true)
+    {
         // poll buttons
         // We have to have some delay here else we risk starvation.
     }

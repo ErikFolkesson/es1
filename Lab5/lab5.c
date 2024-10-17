@@ -54,7 +54,7 @@ int main(void)
 
     // Create tasks
     // CLP_D1, CLP_D2, CLP_D3, CLP_D4
-    // FixME: Placeholder
+    // FixME: Should use xTaskCreate instead.
     blink_LED_1 = vTaskBlink(CLP_D1, 1000, LED_mutex_1);
     blink_LED_2 = vTaskBlink(CLP_D2, 2000, LED_mutex_2);
     blink_LED_3 = vTaskBlink(CLP_D3, 3000, null);
@@ -64,12 +64,12 @@ int main(void)
     hold_LED_1 = vTaskHold(CLP_D1);
     hold_LED_2 = vTaskHold(CLP_D2);
 
-    // Start tasks
+    // Start the scheduler with vTaskStartScheduler
 
 
     while(true) {
         // poll buttons
-        //
+        // We have to have some delay here else we risk starvation.
     }
 
     return 0;

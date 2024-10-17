@@ -15,7 +15,6 @@ int main(void)
 {
     UART_reset();
     UART_init();
-    UART_putChar('a');
     while (true)
     {
         UART_getString(buf, BUF_SIZE);

@@ -1,10 +1,10 @@
 #include "uartdriver.h"
 
-// NOTE: According to the spec, these are the only includes that should be used.
+// Mandatory includes.
 #include <inc/tm4c129encpdt.h>
 #include <stdint.h>
 
-// FIXME: These includes are used for convenience during development, but should maybe be removed for the final version?
+// Convenience includes.
 #include <assert.h>
 #include <stdbool.h>
 
@@ -13,14 +13,16 @@
 
 #define BAUDCLOCK 16000000U
 #define BAUDRATE 9600U
+// ClkDiv should be 16 if High Speed Enable is not set.
 #define CLKDIV 16U
+
+// Baud Rate Divisor calculation.
 #define BRD ((double) BAUDCLOCK / (CLKDIV * BAUDRATE))
 #define BRDINT ((uint32_t) BRD)
 #define BRDFRAC ((uint32_t) ((BRD - BRDINT) * 64 + 0.5))
 
 static bool g_initialized;
 
-// FIXME: If we are supposed to only support UART0, why do we receive uartBase here??
 void UART_init(void)
 {
     // The driver should operate at 9600 baud.
@@ -95,6 +97,7 @@ void UART_putChar(char c)
     UART0_DR_R = c;
 }
 
+// Resets UART0. After a call to this function, UART_init must be called before reading or writing to UART.
 void UART_reset(void)
 {
     // We don't attempt the reset if we haven't yet initialized (Accessing some of the registers is illegal without initialization).
@@ -142,7 +145,7 @@ void UART_reset(void)
     g_initialized = false;
 }
 
-// FIXME: The lab spec doesn't show the arguments for this function, but this seems like the only logical one?
+// Writes the provided NUL-terminated string to UART0.
 void UART_putString(const char *string)
 {
     // Loop through the string until we find the null character, sending each char to UART_putChar()
@@ -152,7 +155,8 @@ void UART_putString(const char *string)
     }
 }
 
-// FIXME: The lab spec doesn't show the arguments for this function. I assume this is what they want? Ideally this would also return the # of characters read.
+// Receives a string of characters into the provided buffer and terminates it with a NUL-character.
+// The maximum amount of characters read is `bufSize - 1`.
 void UART_getString(char *buf, uint32_t bufSize)
 {
     uint16_t i;

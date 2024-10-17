@@ -11,6 +11,10 @@
 #define GPIO_PIN_0 (1U << 0U)
 #define GPIO_PIN_1 (1U << 1U)
 
+// The configuration bits for the GPIO Port Control register.
+#define GPIO_PIN_0_USE_UART (1U << 0U)
+#define GPIO_PIN_1_USE_UART (1U << 4U)
+
 #define BAUDCLOCK 16000000U
 #define BAUDRATE 9600U
 // ClkDiv should be 16 if High Speed Enable is not set.
@@ -47,7 +51,7 @@ void UART_init(void)
     GPIO_PORTA_AHB_AFSEL_R |= GPIO_PIN_0 | GPIO_PIN_1;
 
     // Assign the GPIO pins to UART functionality.
-    GPIO_PORTA_AHB_PCTL_R |= 17U; // 4th and 0th bit set.
+    GPIO_PORTA_AHB_PCTL_R |= GPIO_PIN_0_USE_UART | GPIO_PIN_1_USE_UART;
 
     // Set the baud rate.
     UART0_FBRD_R = BRDFRAC;
@@ -124,7 +128,7 @@ void UART_reset(void)
     UART0_IBRD_R = 0;
 
     // Unassign UART signals for the GPIO pins.
-    GPIO_PORTA_AHB_PCTL_R &= ~17U; // 4th and 0th bit set.
+    GPIO_PORTA_AHB_PCTL_R &= ~(GPIO_PIN_0_USE_UART | GPIO_PIN_1_USE_UART);
 
     // Unset GPIO AFSEL for the pins.
     GPIO_PORTA_AHB_AFSEL_R &= ~(GPIO_PIN_0 | GPIO_PIN_1);

@@ -2,8 +2,12 @@
 #include "task.h"
 #include "semphr.h"
 
+#include <stdbool.h>
+
 #include "drivers/buttons.h"
 #include "drivers/pinout.h"
+#include "driverlib/gpio.h"
+#include "inc/hw_memmap.h"
 
 void vTaskBlink(void *pvParameters)
 {

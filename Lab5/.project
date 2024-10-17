@@ -26,19 +26,14 @@
 	</natures>
 	<linkedResources>
 		<link>
-			<name>FreeRTOSConfig.h</name>
-			<type>1</type>
-			<locationURI>PARENT-3-PROJECT_LOC/Downloads/FreeRTOSConfig.h</locationURI>
-		</link>
-		<link>
 			<name>drivers/buttons.c</name>
 			<type>1</type>
-			<locationURI>PARENT-5-PROJECT_LOC/ti/TivaWare_C_Series-2.2.0.295/examples/boards/ek-tm4c129exl/drivers/buttons.c</locationURI>
+			<locationURI>TI_PRODUCTS_DIR/TivaWare_C_Series-2.2.0.295/examples/boards/ek-tm4c129exl/drivers/buttons.c</locationURI>
 		</link>
 		<link>
 			<name>drivers/pinout.c</name>
 			<type>1</type>
-			<locationURI>PARENT-5-PROJECT_LOC/ti/TivaWare_C_Series-2.2.0.295/examples/boards/ek-tm4c129exl/drivers/pinout.c</locationURI>
+			<locationURI>TI_PRODUCTS_DIR/TivaWare_C_Series-2.2.0.295/examples/boards/ek-tm4c129exl/drivers/pinout.c</locationURI>
 		</link>
 	</linkedResources>
 </projectDescription>

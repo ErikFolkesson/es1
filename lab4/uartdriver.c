@@ -39,10 +39,10 @@ void UART_init(void)
     UART_reset();
 
     // Enable the UART module.
-    SYSCTL_RCGCUART_R = SYSCTL_RCGCUART_R0; // "There must be a delay of 3 system clocks after the UART module clock is enabled before any UART module registers are accessed."
+    SYSCTL_RCGCUART_R |= SYSCTL_RCGCUART_R0; // "There must be a delay of 3 system clocks after the UART module clock is enabled before any UART module registers are accessed."
 
     // Enable the GPIO module clock.
-    SYSCTL_RCGCGPIO_R = SYSCTL_RCGCGPIO_R0; // "There must be a delay of 3 system clocks after the GPIO module clock is enabled before any GPIO module registers are accessed."
+    SYSCTL_RCGCGPIO_R |= SYSCTL_RCGCGPIO_R0; // "There must be a delay of 3 system clocks after the GPIO module clock is enabled before any GPIO module registers are accessed."
 
     // Set the UART clock to be PIOSC.
     UART0_CC_R = UART_CC_CS_PIOSC;
@@ -62,7 +62,7 @@ void UART_init(void)
     UART0_LCRH_R |= UART_LCRH_WLEN_8;
 
     // Enable the digital register bit for the GPIO pins.
-    GPIO_PORTA_AHB_DEN_R = 0x3;
+    GPIO_PORTA_AHB_DEN_R |= GPIO_PIN_0 | GPIO_PIN_1;
 
     // Enable UART.
     UART0_CTL_R |= UART_CTL_UARTEN;
@@ -118,7 +118,7 @@ void UART_reset(void)
     UART0_CTL_R &= ~UART_CTL_UARTEN;
 
     // Disable digital enable for the GPIO pins.
-    GPIO_PORTA_AHB_DEN_R = ~0x3;
+    GPIO_PORTA_AHB_DEN_R &= ~(GPIO_PIN_0 | GPIO_PIN_1);
 
     // Clear the message length.
     UART0_LCRH_R &= ~UART_LCRH_WLEN_8;

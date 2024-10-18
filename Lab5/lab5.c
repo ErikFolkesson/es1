@@ -11,50 +11,60 @@
 #include "drivers/pinout.h"
 #include "driverlib/gpio.h"
 #include "inc/hw_memmap.h"
+#include "driverlib/sysctl.h"
 
 typedef struct
 {
-    SemaphoreHandle_t *ledMutex; // The mutex for modifying/holding the LED.
+    SemaphoreHandle_t ledMutex; // The mutex for modifying/holding the LED.
     uint16_t blinkDuration; // How many milliseconds the LED should spend in each on/off state.
+    uint8_t startOffsetSeconds; // How many seconds to wait before the blinking should start.
     uint8_t ledId; // CLP_D1 .. CLP_D4.
 } TaskBlinkArgs;
 
 typedef struct
 {
-    SemaphoreHandle_t *ledMutex; // The mutex for modifying/holding the LED.
-    SemaphoreHandle_t *buttonSemaphore; // The semaphore which signals a button press.
+    SemaphoreHandle_t ledMutex; // The mutex for modifying/holding the LED.
+    SemaphoreHandle_t buttonSemaphore; // The semaphore which signals a button press.
     uint8_t ledId; // CLP_D1 .. CLP_D4.
 } TaskHoldArgs;
+
+typedef struct
+{
+    SemaphoreHandle_t leftButtonSemaphore; // The semaphore which signals the left button press.
+    SemaphoreHandle_t rightButtonSemaphore; // The semaphore which signals the right button press.
+} ButtonHandlerArgs;
 
 void vTaskBlink(void *pvParameters)
 {
     const TaskBlinkArgs *args = pvParameters;
 
-    // FixMe: Maybe add synch?
-
     // Get start time
     TickType_t currentWakeTime = xTaskGetTickCount();
+    vTaskDelayUntil(&currentWakeTime,
+                    pdMS_TO_TICKS(args->startOffsetSeconds * 1000));
 
-    while (true)
+    if (args->ledMutex == NULL)
     {
-        if (args->ledMutex == NULL)
+        while (true)
         {
             // Turn on LED args.ledId
             LEDWrite((args->ledId), (args->ledId));
 
-            // Wait for args.blinkDuration m
+            // Wait for args.blinkDuration ms
             vTaskDelayUntil(&currentWakeTime,
-                            args->blinkDuration / portTICK_PERIOD_MS);
+                            pdMS_TO_TICKS(args->blinkDuration));
 
             // Turn off LED args.ledId
             LEDWrite((args->ledId), 0);
 
             // Wait for args.blinkDuration ms
             vTaskDelayUntil(&currentWakeTime,
-                            args->blinkDuration / portTICK_PERIOD_MS);
-
+                            pdMS_TO_TICKS(args->blinkDuration));
         }
-        else
+    }
+    else
+    {
+        while (true)
         {
             // take mutex without blocking
             BaseType_t success = xSemaphoreTake(args->ledMutex, 0);
@@ -63,21 +73,24 @@ void vTaskBlink(void *pvParameters)
             {
                 // Turn on LED args.ledId
                 LEDWrite((args->ledId), (args->ledId));
+                xSemaphoreGive(args->ledMutex);
             }
 
             // Wait for args.blinkDuration m
             vTaskDelayUntil(&currentWakeTime,
-                            args->blinkDuration / portTICK_PERIOD_MS);
+                            pdMS_TO_TICKS(args->blinkDuration));
 
+            success = xSemaphoreTake(args->ledMutex, 0);
             if (success)
             {
                 // Turn off LED args.ledId
                 LEDWrite((args->ledId), 0);
+                xSemaphoreGive(args->ledMutex);
             }
 
             // Wait for args.blinkDuration ms
             vTaskDelayUntil(&currentWakeTime,
-                            args->blinkDuration / portTICK_PERIOD_MS);
+                            pdMS_TO_TICKS(args->blinkDuration));
         }
     }
 }
@@ -117,118 +130,135 @@ void vTaskHold(void *pvParameters)
     }
 }
 
-// FixMe: Interrupt handler for the buttons?
+void buttonHandler(void *parameters)
+{
+    const ButtonHandlerArgs *args = parameters;
+    const TickType_t sleepDuration = pdMS_TO_TICKS(10);
+
+    while (true)
+    {
+        uint8_t ucState;
+        uint8_t ucDelta;
+        // Poll the buttons.
+        ucState = ButtonsPoll(&ucDelta, 0);
+
+        if (BUTTON_PRESSED(LEFT_BUTTON, ucState, ucDelta))
+        {
+            // Turn on LED 1 by releasing the semaphore button_sem_1
+            xSemaphoreGive(args->leftButtonSemaphore);
+        }
+
+        if (BUTTON_PRESSED(RIGHT_BUTTON, ucState, ucDelta))
+        {
+            // Turn on LED 2 by releasing the semaphore button_sem_2
+            xSemaphoreGive(args->rightButtonSemaphore);
+        }
+
+        // We have to have some delay here else we risk starvation.
+        vTaskDelay(sleepDuration);
+    }
+}
 
 int main(void)
 {
+    // Set the system clock to the same as in FreeRTOSConfig.h.
+    SysCtlClockFreqSet(
+    SYSCTL_XTAL_25MHZ | SYSCTL_OSC_MAIN | SYSCTL_USE_PLL | SYSCTL_CFG_VCO_480,
+                       SYSTEM_CLOCK);
+
     // Create mutexes and binaries
     SemaphoreHandle_t LED_mutex_1 = xSemaphoreCreateMutex();
     SemaphoreHandle_t LED_mutex_2 = xSemaphoreCreateMutex();
 
-    SemaphoreHandle_t button_sem_1 = xSemaphoreCreateCounting(1, 0);
-    SemaphoreHandle_t button_sem_2 = xSemaphoreCreateCounting(1, 0);
-
-    // FixMe: Block for 10 ms
-    const TickType_t xDelay = 10 / portTICK_PERIOD_MS;
+    SemaphoreHandle_t button_sem_1 = xSemaphoreCreateBinary();
+    SemaphoreHandle_t button_sem_2 = xSemaphoreCreateBinary();
 
     // Init LEDs
     // Configure the device pins.
     PinoutSet(false, false);
 
-    // Enable the GPIO pin for the LED (PN0 - PN3).
-    // Set the direction as output, and
-    // enable the GPIO pin for digital function.
-    GPIOPinTypeGPIOOutput(GPIO_PORTN_BASE,
-    GPIO_PIN_0 | GPIO_PIN_1 | GPIO_PIN_2 | GPIO_PIN_3);
+    // Enable the GPIO pin for the LED (PN0,PN1,PF4,PF0).
+    // Set the direction as output, and enable the GPIO pin for digital function.
+    // LED 1 and 2.
+    GPIOPinTypeGPIOOutput(GPIO_PORTN_BASE, GPIO_PIN_0 | GPIO_PIN_1);
+    // LED 3 and 4.
+    GPIOPinTypeGPIOOutput(GPIO_PORTF_BASE, GPIO_PIN_0 | GPIO_PIN_4);
 
     // Initialize the button driver.
     ButtonsInit();
-    unsigned char ucDelta, ucState;
 
-    // FIXME: These could be defines? Potentially enums.
-    const uint16_t taskStackDepth = 1000; // FIXME: Figure out good stack depth. (shouldn't need to be large?)
-    const UBaseType_t blinkTaskPrio = tskIDLE_PRIORITY + 2;
+    const uint16_t taskStackDepth = 1000;
+    const UBaseType_t blinkTaskPrio = tskIDLE_PRIORITY + 1;
     const UBaseType_t holdTaskPrio = tskIDLE_PRIORITY + 1;
+    const UBaseType_t buttonHandlerPrio = tskIDLE_PRIORITY + 1;
 
     // Construct task arguments as static variables to make sure they outlive the tasks.
     static TaskBlinkArgs blink1Args;
-    blink1Args = (TaskBlinkArgs ) { .ledMutex = &LED_mutex_1, .blinkDuration =
+    blink1Args = (TaskBlinkArgs ) { .ledMutex = LED_mutex_1, .blinkDuration =
                                             1000,
-                                    .ledId = CLP_D1 };
+                                    .startOffsetSeconds = 0, .ledId = CLP_D1 };
     static TaskBlinkArgs blink2Args;
-    blink2Args = (TaskBlinkArgs ) { .ledMutex = &LED_mutex_2, .blinkDuration =
+    blink2Args = (TaskBlinkArgs ) { .ledMutex = LED_mutex_2, .blinkDuration =
                                             2000,
-                                    .ledId = CLP_D2 };
+                                    .startOffsetSeconds = 2, .ledId = CLP_D2 };
     static TaskBlinkArgs blink3Args;
     blink3Args = (TaskBlinkArgs ) { .ledMutex = NULL, .blinkDuration = 3000,
-                                    .ledId = CLP_D3 };
+                                    .startOffsetSeconds = 4, .ledId = CLP_D3 };
     static TaskBlinkArgs blink4Args;
     blink4Args = (TaskBlinkArgs ) { .ledMutex = NULL, .blinkDuration = 4000,
-                                    .ledId = CLP_D4 };
+                                    .startOffsetSeconds = 6, .ledId = CLP_D4 };
 
     static TaskHoldArgs hold1Args;
-    hold1Args = (TaskHoldArgs ) { .ledMutex = &LED_mutex_1, .buttonSemaphore =
-                                          &button_sem_1,
+    hold1Args = (TaskHoldArgs ) { .ledMutex = LED_mutex_1, .buttonSemaphore =
+                                          button_sem_1,
                                   .ledId = CLP_D1 };
     static TaskHoldArgs hold2Args;
-    hold2Args = (TaskHoldArgs ) { .ledMutex = &LED_mutex_2, .buttonSemaphore =
-                                          &button_sem_2,
+    hold2Args = (TaskHoldArgs ) { .ledMutex = LED_mutex_2, .buttonSemaphore =
+                                          button_sem_2,
                                   .ledId = CLP_D2 };
 
-    // FIXME: Might not need the handles?
-    TaskHandle_t blink1Task;
-    BaseType_t result = xTaskCreate(vTaskBlink, "BlinkLed1", taskStackDepth,
-                                    &blink1Args, blinkTaskPrio, &blink1Task);
-    assert(result == pdPASS);
-    // FIXME: In the example used in the xTaskCreate doc comment, they use configASSERT(taskHandle). Figure out what that actually does.
+    static ButtonHandlerArgs buttonHandlerArgs;
+    buttonHandlerArgs = (ButtonHandlerArgs ) { .leftButtonSemaphore =
+                                                       button_sem_1,
+                                               .rightButtonSemaphore =
+                                                       button_sem_2 };
 
-    TaskHandle_t blink2Task;
+    BaseType_t result;
+    result = xTaskCreate(vTaskBlink, "BlinkLed1", taskStackDepth, &blink1Args,
+                         blinkTaskPrio, NULL);
+    assert(result == pdPASS);
+
     result = xTaskCreate(vTaskBlink, "BlinkLed2", taskStackDepth, &blink2Args,
-                         blinkTaskPrio, &blink2Task);
+                         blinkTaskPrio, NULL);
     assert(result == pdPASS);
 
-    TaskHandle_t blink3Task;
     result = xTaskCreate(vTaskBlink, "BlinkLed3", taskStackDepth, &blink3Args,
-                         blinkTaskPrio, &blink3Task);
+                         blinkTaskPrio, NULL);
     assert(result == pdPASS);
 
-    TaskHandle_t blink4Task;
     result = xTaskCreate(vTaskBlink, "BlinkLed4", taskStackDepth, &blink4Args,
-                         blinkTaskPrio, &blink4Task);
+                         blinkTaskPrio, NULL);
     assert(result == pdPASS);
 
-    TaskHandle_t hold1Task;
     result = xTaskCreate(vTaskHold, "HoldLed1", taskStackDepth, &hold1Args,
-                         holdTaskPrio, &hold1Task);
+                         holdTaskPrio, NULL);
     assert(result == pdPASS);
 
-    TaskHandle_t hold2Task;
     result = xTaskCreate(vTaskHold, "HoldLed2", taskStackDepth, &hold2Args,
-                         holdTaskPrio, &hold2Task);
+                         holdTaskPrio, NULL);
+    assert(result == pdPASS);
+
+    result = xTaskCreate(buttonHandler, "buttonHandler", taskStackDepth,
+                         &buttonHandlerArgs, buttonHandlerPrio, NULL);
     assert(result == pdPASS);
 
     // Start the scheduler with vTaskStartScheduler
     vTaskStartScheduler();
 
+    // We should never reach here since vTaskStartScheduler should block.
+    assert(false);
     while (true)
     {
-        // Poll the buttons.
-        ucState = ButtonsPoll(&ucDelta, 0);
-
-        if (BUTTON_PRESSED(RIGHT_BUTTON, ucState, ucDelta))
-        {
-            // Turn on LED 1 by releasing the semaphore button_sem_1
-            xSemaphoreGive(button_sem_1);
-        }
-
-        if (BUTTON_PRESSED(LEFT_BUTTON, ucState, ucDelta))
-        {
-            // Turn on LED 2 by releasing the semaphore button_sem_2
-            xSemaphoreGive(button_sem_2);
-        }
-
-        // We have to have some delay here else we risk starvation.
-        vTaskDelay(xDelay);
     }
 }
 

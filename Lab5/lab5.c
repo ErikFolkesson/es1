@@ -85,11 +85,35 @@ void vTaskBlink(void *pvParameters)
 void vTaskHold(void *pvParameters)
 {
     const TaskHoldArgs *args = pvParameters;
-// Take unavailable semaphore
-// Lower priority
+    const TickType_t sleepDuration = pdMS_TO_TICKS(10000);
+
     while (true)
     {
-        // Task code
+        // The task will be blocked here until the handler for the button press releases the semaphore.
+        xSemaphoreTake(args->buttonSemaphore, portMAX_DELAY);
+        // Prevent the handler for the button press from giving the semaphore while we're holding the LED.
+        xSemaphoreGive(args->buttonSemaphore);
+
+        TickType_t startTimePoint = xTaskGetTickCount();
+
+        // Prevent race condition when writing to the LED.
+        xSemaphoreTake(args->ledMutex, portMAX_DELAY);
+        // Save original state of LED so it can be restored later on.
+        uint32_t ledStates;
+        LEDRead(&ledStates);
+
+        // Turn on the LED.
+        LEDWrite(args->ledId, args->ledId);
+
+        vTaskDelayUntil(&startTimePoint, sleepDuration);
+
+        // Return the LED to its state before holding.
+        LEDWrite(args->ledId, ledStates);
+
+        xSemaphoreGive(args->ledMutex);
+        // Allow the handler for the button press to signal a button press again.
+        BaseType_t success = xSemaphoreTake(args->buttonSemaphore, 0);
+        assert(success); // We should always be able to take the semaphore.
     }
 }
 

@@ -15,7 +15,7 @@
 typedef struct
 {
     SemaphoreHandle_t *ledMutex; // The mutex for modifying/holding the LED.
-    uint16_t blinkDuration; // How many microseconds the LED should spend in each on/off state.
+    uint16_t blinkDuration; // How many milliseconds the LED should spend in each on/off state.
     uint8_t ledId; // CLP_D1 .. CLP_D4.
 } TaskBlinkArgs;
 
@@ -29,14 +29,56 @@ typedef struct
 void vTaskBlink(void *pvParameters)
 {
     const TaskBlinkArgs *args = pvParameters;
-    // Init specified LED
 
-    // Synch, maybe
+    // FixMe: Maybe add synch?
+
+    // Get start time
+    TickType_t currentWakeTime = xTaskGetTickCount();
 
     while (true)
     {
-        // Task code
+        if (args->ledMutex == NULL)
+        {
+            // Turn on LED args.ledId
+            LEDWrite((args->ledId), (args->ledId));
 
+            // Wait for args.blinkDuration m
+            vTaskDelayUntil(&currentWakeTime,
+                            args->blinkDuration / portTICK_PERIOD_MS);
+
+            // Turn off LED args.ledId
+            LEDWrite((args->ledId), 0);
+
+            // Wait for args.blinkDuration ms
+            vTaskDelayUntil(&currentWakeTime,
+                            args->blinkDuration / portTICK_PERIOD_MS);
+
+        }
+        else
+        {
+            // take mutex without blocking
+            BaseType_t success = xSemaphoreTake(args->ledMutex, 0);
+
+            if (success)
+            {
+                // Turn on LED args.ledId
+                LEDWrite((args->ledId), (args->ledId));
+            }
+
+            // Wait for args.blinkDuration m
+            vTaskDelayUntil(&currentWakeTime,
+                            args->blinkDuration / portTICK_PERIOD_MS);
+
+            if (success)
+            {
+                // Turn off LED args.ledId
+                LEDWrite((args->ledId), 0);
+            }
+
+            // Wait for args.blinkDuration ms
+            vTaskDelayUntil(&currentWakeTime,
+                            args->blinkDuration / portTICK_PERIOD_MS);
+        }
     }
 }
 
@@ -164,7 +206,5 @@ int main(void)
         // We have to have some delay here else we risk starvation.
         vTaskDelay(xDelay);
     }
-
-    return 0;
 }
 

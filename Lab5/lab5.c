@@ -59,21 +59,25 @@ int main(void)
     SemaphoreHandle_t LED_mutex_1 = xSemaphoreCreateMutex();
     SemaphoreHandle_t LED_mutex_2 = xSemaphoreCreateMutex();
 
-    SemaphoreHandle_t button_sem_1 = xSemaphoreCreateBinary(); // FixMe: Maybe should be: xSemaphoreCreateCounting(1, 0);
-    SemaphoreHandle_t button_sem_2 = xSemaphoreCreateBinary();
+    SemaphoreHandle_t button_sem_1 = xSemaphoreCreateCounting(1, 0);
+    SemaphoreHandle_t button_sem_2 = xSemaphoreCreateCounting(1, 0);
+
+    // FixMe: Block for 10 ms
+    const TickType_t xDelay = 10 / portTICK_PERIOD_MS;
 
     // Init LEDs
     // Configure the device pins.
     PinoutSet(false, false);
-
-    // Initialize the button driver.
-    ButtonsInit();
 
     // Enable the GPIO pin for the LED (PN0 - PN3).
     // Set the direction as output, and
     // enable the GPIO pin for digital function.
     GPIOPinTypeGPIOOutput(GPIO_PORTN_BASE,
     GPIO_PIN_0 | GPIO_PIN_1 | GPIO_PIN_2 | GPIO_PIN_3);
+
+    // Initialize the button driver.
+    ButtonsInit();
+    unsigned char ucDelta, ucState;
 
     // FIXME: These could be defines? Potentially enums.
     const uint16_t taskStackDepth = 1000; // FIXME: Figure out good stack depth. (shouldn't need to be large?)
@@ -142,8 +146,23 @@ int main(void)
 
     while (true)
     {
-        // poll buttons
+        // Poll the buttons.
+        ucState = ButtonsPoll(&ucDelta, 0);
+
+        if (BUTTON_PRESSED(RIGHT_BUTTON, ucState, ucDelta))
+        {
+            // Turn on LED 1 by releasing the semaphore button_sem_1
+            xSemaphoreGive(button_sem_1);
+        }
+
+        if (BUTTON_PRESSED(LEFT_BUTTON, ucState, ucDelta))
+        {
+            // Turn on LED 2 by releasing the semaphore button_sem_2
+            xSemaphoreGive(button_sem_2);
+        }
+
         // We have to have some delay here else we risk starvation.
+        vTaskDelay(xDelay);
     }
 
     return 0;

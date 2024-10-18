@@ -16,6 +16,10 @@
 #include "driverlib/uart.h"
 #include "inc/tm4c129encpdt.h"
 
+#define WAIT_ITERATIONS 60000000
+
+SemaphoreHandle_t g_printMutex;
+
 void ConfigureUART(void)
 {
     SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOA);
@@ -50,7 +54,8 @@ void uartPuts(const char *str)
 typedef struct
 {
     SemaphoreHandle_t mutex; // The mutex
-    uint16_t startOffsetSeconds; // How many seconds to wait before the blinking should start.
+    uint16_t startOffsetMs; // How many milliseconds to wait before the blinking should start.
+    const char *name;
 } TaskArgs;
 
 void vTaskTakeMutex(void *pvParameters)
@@ -59,22 +64,52 @@ void vTaskTakeMutex(void *pvParameters)
 
     TickType_t startTimePoint = xTaskGetTickCount();
 
-    vTaskDelayUntil(&startTimePoint, args->startOffsetSeconds);
+    vTaskDelay(pdMS_TO_TICKS(args->startOffsetMs));
+
+    xSemaphoreTake(g_printMutex, portMAX_DELAY);
+    uartPuts("Task ");
+    uartPuts(args->name);
+    uartPuts(" started\r\n");
+    xSemaphoreGive(g_printMutex);
+
+    xSemaphoreTake(args->mutex, portMAX_DELAY);
+
+    xSemaphoreTake(g_printMutex, portMAX_DELAY);
+    uartPuts("Task ");
+    uartPuts(args->name);
+    uartPuts(" sem take\r\n");
+    xSemaphoreGive(g_printMutex);
+
+    xSemaphoreTake(g_printMutex, portMAX_DELAY);
+    uartPuts("Task ");
+    uartPuts(args->name);
+    uartPuts(" started its workload\r\n");
+    xSemaphoreGive(g_printMutex);
+
+    volatile int i = 0;
+    while (i < WAIT_ITERATIONS)
+    {
+        i++;
+    }
+
+    xSemaphoreTake(g_printMutex, portMAX_DELAY);
+    uartPuts("Task ");
+    uartPuts(args->name);
+    uartPuts(" sem give\r\n");
+    xSemaphoreGive(g_printMutex);
+
+    xSemaphoreGive(args->mutex);
+
+    xSemaphoreTake(g_printMutex, portMAX_DELAY);
+    uartPuts("Task ");
+    uartPuts(args->name);
+    uartPuts(" finished\r\n");
+    xSemaphoreGive(g_printMutex);
 
     while (true)
     {
-        // The task will be blocked here until the handler for the button press releases the semaphore.
-        xSemaphoreTake(args->mutex, portMAX_DELAY);
+    vTaskDelay(pdMS_TO_TICKS(10000));
 
-        volatile int i = 0;
-
-        while (i < 600000)
-        {
-            i++;
-        }
-
-        // Prevent the handler for the button press from giving the semaphore while we're holding the LED.
-        xSemaphoreGive(args->mutex);
     }
 }
 
@@ -84,16 +119,35 @@ void vTaskBusyWork(void *pvParameters)
 
     TickType_t startTimePoint = xTaskGetTickCount();
 
-    vTaskDelayUntil(&startTimePoint, args->startOffsetSeconds);
+    vTaskDelay(pdMS_TO_TICKS(args->startOffsetMs));
+
+    xSemaphoreTake(g_printMutex, portMAX_DELAY);
+    uartPuts("Task ");
+    uartPuts(args->name);
+    uartPuts(" started\r\n");
+    xSemaphoreGive(g_printMutex);
+
+    xSemaphoreTake(g_printMutex, portMAX_DELAY);
+    uartPuts("Task ");
+    uartPuts(args->name);
+    uartPuts(" started its workload\r\n");
+    xSemaphoreGive(g_printMutex);
+
+    volatile int i = 0;
+    while (i < WAIT_ITERATIONS)
+    {
+        i++;
+    }
+
+    xSemaphoreTake(g_printMutex, portMAX_DELAY);
+    uartPuts("Task ");
+    uartPuts(args->name);
+    uartPuts(" finished\r\n");
+    xSemaphoreGive(g_printMutex);
 
     while (true)
     {
-        volatile int i = 0;
-
-        while (i < 600000)
-        {
-            i++;
-        }
+        vTaskDelay(pdMS_TO_TICKS(10000));
     }
 }
 
@@ -107,7 +161,10 @@ int main(void)
                        SYSTEM_CLOCK);
 
     // Create mutexes and binaries
-    SemaphoreHandle_t mutex = xSemaphoreCreateMutex();
+    SemaphoreHandle_t mutex = xSemaphoreCreateCounting(1, 1);
+    assert(mutex);
+
+    g_printMutex = xSemaphoreCreateMutex();
 
     const uint16_t taskStackDepth = 1000;
     const UBaseType_t lowPrio = tskIDLE_PRIORITY + 1;
@@ -116,30 +173,28 @@ int main(void)
 
     // Construct task arguments as static variables to make sure they outlive the tasks.
     static TaskArgs lowPriorityArgs;
-    lowPriorityArgs = (TaskArgs ) { .mutex = mutex, .startOffsetSeconds = 0 };
+    lowPriorityArgs = (TaskArgs ) { .mutex = mutex, .startOffsetMs = 0, .name = "low" };
 
     static TaskArgs mediumPriorityArgs;
-    mediumPriorityArgs = (TaskArgs ) { .mutex = mutex, .startOffsetSeconds =
-                                               2000 };
+    mediumPriorityArgs = (TaskArgs ) { .mutex = mutex, .startOffsetMs =
+                                               400, .name = "mid" };
 
     static TaskArgs highPriorityArgs;
     highPriorityArgs =
-            (TaskArgs ) { .mutex = mutex, .startOffsetSeconds = 1000 };
+            (TaskArgs ) { .mutex = mutex, .startOffsetMs = 200, .name = "high" };
 
     BaseType_t result;
     result = xTaskCreate(vTaskTakeMutex, "LowPrioTask", taskStackDepth,
                          &lowPriorityArgs, lowPrio, NULL);
     assert(result == pdPASS);
 
-    result = xTaskCreate(vTaskBusyWork, "MediumPrioTask", taskStackDepth,
+    result = xTaskCreate(vTaskBusyWork, "MidPrioTask", taskStackDepth,
                          &mediumPriorityArgs, mediumPrio, NULL);
     assert(result == pdPASS);
 
     result = xTaskCreate(vTaskTakeMutex, "HighPrioTask", taskStackDepth,
                          &highPriorityArgs, highPrio, NULL);
     assert(result == pdPASS);
-
-    uartPuts("Test");
 
     // Start the scheduler with vTaskStartScheduler
     vTaskStartScheduler();

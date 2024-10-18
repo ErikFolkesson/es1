@@ -7,25 +7,44 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include "drivers/buttons.h"
-#include "drivers/pinout.h"
 #include "driverlib/gpio.h"
 #include "inc/hw_memmap.h"
 #include "driverlib/sysctl.h"
 
+#include "driverlib/pin_map.h"
+#include "driverlib/interrupt.h"
 #include "driverlib/uart.h"
-#include "utils/uartstdio.h"
+#include "inc/tm4c129encpdt.h"
 
-// Configure the UART.
 void ConfigureUART(void)
 {
     SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOA);
     SysCtlPeripheralEnable(SYSCTL_PERIPH_UART0);
+
     GPIOPinConfigure(GPIO_PA0_U0RX);
     GPIOPinConfigure(GPIO_PA1_U0TX);
+
     GPIOPinTypeUART(GPIO_PORTA_BASE, GPIO_PIN_0 | GPIO_PIN_1);
+
+    uint32_t baudRate = 115200;
+    // 8 data bits, 1 stop bit, and no parity bit.
+    uint32_t uartConfig = UART_CONFIG_WLEN_8 | UART_CONFIG_STOP_ONE
+            | UART_CONFIG_PAR_NONE;
+    // For PIOSC clock, the frequency should be set as 16'000'000
+    uint32_t systemClockFrequency = 16000000;
+    UARTConfigSetExpClk(UART0_BASE, systemClockFrequency, baudRate, uartConfig);
     UARTClockSourceSet(UART0_BASE, UART_CLOCK_PIOSC);
-    UARTStdioConfig(0, 115200, 16000000);
+
+    UARTEnable(UART0_BASE);
+}
+
+void uartPuts(const char *str)
+{
+    const char *it;
+    for (it = str; *it != '\0'; it++)
+    {
+        UARTCharPut(UART0_BASE, *it);
+    }
 }
 
 typedef struct
@@ -120,7 +139,7 @@ int main(void)
                          &highPriorityArgs, highPrio, NULL);
     assert(result == pdPASS);
 
-    UARTprintf("\033[2JEnter text: ");
+    uartPuts("Test");
 
     // Start the scheduler with vTaskStartScheduler
     vTaskStartScheduler();

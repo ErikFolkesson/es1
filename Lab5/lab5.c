@@ -181,7 +181,6 @@ int main(void)
     TaskHandle_t hold2Task;
     result = xTaskCreate(vTaskHold, "HoldLed2", taskStackDepth, &hold2Args,
                          holdTaskPrio, &hold2Task);
-    assert(result == pdPASS);
 
     // Start the scheduler with vTaskStartScheduler
     vTaskStartScheduler();

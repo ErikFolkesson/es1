@@ -245,16 +245,12 @@ int main(void)
     assert(result == pdPASS);
 
     result = xTaskCreate(vTaskHold, "HoldLed2", taskStackDepth, &hold2Args,
-<<<<<<< HEAD
-                         holdTaskPrio, &hold2Task);
-=======
                          holdTaskPrio, NULL);
     assert(result == pdPASS);
 
     result = xTaskCreate(buttonHandler, "buttonHandler", taskStackDepth,
                          &buttonHandlerArgs, buttonHandlerPrio, NULL);
     assert(result == pdPASS);
->>>>>>> 0fd3454077a24c5da93153ae28d99b69fdfc1beb
 
     // Start the scheduler with vTaskStartScheduler
     vTaskStartScheduler();

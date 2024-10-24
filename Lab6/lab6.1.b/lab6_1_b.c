@@ -63,17 +63,11 @@ typedef struct
 
 typedef struct
 {
-    bool *consumerRunnable;
-    bool *producerRunnable;
+    SemaphoreHandle_t *emptySlots;
+    SemaphoreHandle_t *filledSlots;
+    SemaphoreHandle_t *bufferMutex;
     Buffer *buffer;
-} ProducerArgs;
-
-typedef struct
-{
-    bool *producerRunnable;
-    bool *consumerRunnable;
-    Buffer *buffer;
-} ConsumerArgs;
+} Args;
 
 uint8_t produceByte(void)
 {
@@ -108,21 +102,21 @@ void wakeup(bool *wakeupCall)
 
 void producer(void *parameters)
 {
-    const ProducerArgs *args = parameters;
+    const Args *args = parameters;
 
     while (true)
     {
         uartPuts("Producer at start of while!\r\n");
         uint8_t byte = produceByte();
         assert(args->buffer->size <= args->buffer->capacity);
-        // Spin until it's possible to add to buffer.
-        if (args->buffer->size == args->buffer->capacity)
-        {
-            uartPuts("Producer going to sleep!\r\n");
-            sleep(args->producerRunnable);
-            uartPuts("Producer woke up!\r\n");
 
-        }
+        xSemaphoreTake(args->emptySlots, portMAX_DELAY);
+
+        assert(args->buffer->size <= args->buffer->capacity);
+
+        xSemaphoreTake(args->bufferMutex, portMAX_DELAY);
+
+        assert(args->buffer->size <= args->buffer->capacity);
 
         putByteIntoBuffer(args->buffer, byte);
         uint16_t oldSize = args->buffer->size;
@@ -131,11 +125,15 @@ void producer(void *parameters)
         assert(oldSize == newSize);
         args->buffer->size = oldSize + 1;
 
-        if (args->buffer->size == 1)
-        {
-            uartPuts("Producer waking up consumer!\r\n");
-            wakeup(args->consumerRunnable);
-        }
+        assert(args->buffer->size <= args->buffer->capacity);
+        xSemaphoreGive(args->bufferMutex);
+        assert(args->buffer->size <= args->buffer->capacity);
+
+        xSemaphoreGive(args->filledSlots);
+        assert(args->buffer->size <= args->buffer->capacity);
+
+        assert(args->buffer->size <= args->buffer->capacity);
+
         uartPuts("Producer at end of while!\r\n");
     }
 }
@@ -148,22 +146,16 @@ void consumeByte(uint8_t byte)
 
 void consumer(void *parameters)
 {
-    const ConsumerArgs *args = parameters;
+    const Args *args = parameters;
 
     while (true)
     {
         uartPuts("Consumer at start of while!\r\n");
-        if (args->buffer->size == 0)
-        {
-
-            uartPuts("Consumer going to sleep!\r\n");
-
-            sleep(args->consumerRunnable);
-
-            uartPuts("Consumer woke up!\r\n");
-
-        }
-        assert(args->buffer->size != 0);
+        assert(args->buffer->size <= args->buffer->capacity);
+        xSemaphoreTake(args->filledSlots, portMAX_DELAY);
+        assert(args->buffer->size <= args->buffer->capacity);
+        xSemaphoreTake(args->bufferMutex, portMAX_DELAY);
+        assert(args->buffer->size <= args->buffer->capacity);
         uint8_t byte = removeByteFromBuffer(args->buffer);
 
         uint16_t oldSize = args->buffer->size;
@@ -171,17 +163,15 @@ void consumer(void *parameters)
         uint16_t newSize = args->buffer->size;
         assert(oldSize == newSize);
         args->buffer->size = oldSize - 1;
+        assert(args->buffer->size <= args->buffer->capacity);
+        xSemaphoreGive(args->bufferMutex);
+        assert(args->buffer->size <= args->buffer->capacity);
+        xSemaphoreGive(args->emptySlots);
 
         assert(args->buffer->size <= args->buffer->capacity);
-        if (args->buffer->size == args->buffer->capacity - 1)
-        {
-
-            uartPuts("Consumer waking up producer!\r\n");
-
-            wakeup(args->producerRunnable);
-        }
 
         consumeByte(byte);
+
         uartPuts("Consumer at end of while!\r\n");
     }
 }
@@ -207,7 +197,6 @@ int main(void)
 
     uartPuts("\r\nStarting new run\r\n");
 
-
     const uint16_t taskStackDepth = 1000;
     const UBaseType_t priority = tskIDLE_PRIORITY + 1;
 
@@ -218,27 +207,29 @@ int main(void)
     uint8_t bufferData[BUFFER_CAPACITY] = { 0 };
     static Buffer buffer;
     buffer = (Buffer ) { .data = bufferData, .capacity = BUFFER_CAPACITY };
-    static bool consumerRunnable = false;
-    static bool producerRunnable = true;
+    static SemaphoreHandle_t emptySlots;
+    emptySlots = xSemaphoreCreateCounting(
+            BUFFER_CAPACITY, BUFFER_CAPACITY);
+    static SemaphoreHandle_t filledSlots;
+    filledSlots = xSemaphoreCreateCounting(
+            BUFFER_CAPACITY, 0);
+    static SemaphoreHandle_t bufferMutex;
+    bufferMutex = xSemaphoreCreateMutex();
 
     // Construct task arguments as static variables to make sure they outlive the tasks.
-    static ProducerArgs producerArgs;
-    producerArgs = (ProducerArgs ) { .buffer = &buffer, .consumerRunnable =
-                                             &consumerRunnable,
-                                     .producerRunnable = &producerRunnable };
-
-    static ConsumerArgs consumerArgs;
-    consumerArgs = (ConsumerArgs ) { .buffer = &buffer, .consumerRunnable =
-                                             &consumerRunnable,
-                                     .producerRunnable = &producerRunnable };
+    static Args args;
+    args = (Args )
+            { .buffer = &buffer, .emptySlots = emptySlots, .filledSlots =
+                      filledSlots,
+              .bufferMutex = bufferMutex };
 
     BaseType_t result;
-    result = xTaskCreate(consumer, "consumer", taskStackDepth, &consumerArgs,
-                         priority, NULL);
+    result = xTaskCreate(consumer, "consumer", taskStackDepth, &args, priority,
+                         NULL);
     assert(result == pdPASS);
 
-    result = xTaskCreate(producer, "producer", taskStackDepth, &producerArgs,
-                         priority, NULL);
+    result = xTaskCreate(producer, "producer", taskStackDepth, &args, priority,
+                         NULL);
     assert(result == pdPASS);
 
     // Start the scheduler with vTaskStartScheduler

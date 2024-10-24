@@ -45,150 +45,144 @@ void ConfigureUART(void)
 
 void uartPuts(const char *str)
 {
+    xSemaphoreTake(g_printMutex, portMAX_DELAY);
     const char *it;
     for (it = str; *it != '\0'; it++)
     {
         UARTCharPut(UART0_BASE, *it);
     }
+    xSemaphoreGive(g_printMutex);
 }
 
 typedef struct
 {
-    SemaphoreHandle_t mutex; // The mutex
-    uint16_t releaseTimeMs; // How many milliseconds to wait before the blinking should start.
-    uint16_t periodMs; // How long each period should be.
-    const char *name;
-} TaskArgs;
+    uint8_t *data;
+    uint16_t size;
+    uint16_t capacity;
+} Buffer;
 
-void vTaskTakeMutex(void *pvParameters)
+typedef struct
 {
-    const TaskArgs *args = pvParameters;
+    bool *consumerRunnable;
+    bool *producerRunnable;
+    Buffer *buffer;
+} ProducerArgs;
 
-    vTaskDelay(pdMS_TO_TICKS(args->releaseTimeMs));
+typedef struct
+{
+    bool *producerRunnable;
+    bool *consumerRunnable;
+    Buffer *buffer;
+} ConsumerArgs;
 
-    TickType_t startTimePoint = xTaskGetTickCount();
+uint8_t produceByte(void)
+{
+    // TODO: Visualize with UART.
+    return '|';
+}
 
-    while (true)
+void putByteIntoBuffer(Buffer *buffer, uint8_t byte)
+{
+    assert(buffer->size <= buffer->capacity);
+    buffer->data[buffer->size] = byte;
+}
+
+uint8_t removeByteFromBuffer(Buffer *buffer)
+{
+    return buffer->data[buffer->size - 1];
+}
+
+void sleep(bool *wakeupCall)
+{
+    *wakeupCall = false;
+    // Spin until the bool changes from elsewhere.
+    while (!*wakeupCall)
     {
-        xSemaphoreTake(g_printMutex, portMAX_DELAY);
-        uartPuts("Task ");
-        uartPuts(args->name);
-        uartPuts(" started\r\n");
-        xSemaphoreGive(g_printMutex);
-
-        xSemaphoreTake(args->mutex, portMAX_DELAY);
-
-        xSemaphoreTake(g_printMutex, portMAX_DELAY);
-        uartPuts("Task ");
-        uartPuts(args->name);
-        uartPuts(" sem take\r\n");
-        xSemaphoreGive(g_printMutex);
-
-        xSemaphoreTake(g_printMutex, portMAX_DELAY);
-        uartPuts("Task ");
-        uartPuts(args->name);
-        uartPuts(" started its workload\r\n");
-        xSemaphoreGive(g_printMutex);
-
-        volatile int i = 0;
-        while (i < WAIT_ITERATIONS)
-        {
-            i++;
-        }
-
-        xSemaphoreTake(g_printMutex, portMAX_DELAY);
-        uartPuts("Task ");
-        uartPuts(args->name);
-        uartPuts(" sem give\r\n");
-        xSemaphoreGive(g_printMutex);
-
-        xSemaphoreGive(args->mutex);
-
-        xSemaphoreTake(g_printMutex, portMAX_DELAY);
-        uartPuts("Task ");
-        uartPuts(args->name);
-        uartPuts(" finished\r\n");
-        xSemaphoreGive(g_printMutex);
-
-        TickType_t currentTimePoint = xTaskGetTickCount();
-        TickType_t expectedTimePoint = startTimePoint
-                + pdMS_TO_TICKS(args->periodMs);
-        int32_t difference = (int32_t) currentTimePoint
-                - (int32_t) expectedTimePoint;
-        if (difference > 0)
-        {
-            xSemaphoreTake(g_printMutex, portMAX_DELAY);
-            uartPuts("Task ");
-            uartPuts(args->name);
-            uartPuts(" missed its deadline by ");
-
-            char buf[30] = { 0 };
-            sprintf(buf, "%d", difference);
-            uartPuts(buf);
-            uartPuts("ms\r\n");
-
-            xSemaphoreGive(g_printMutex);
-        }
-
-        vTaskDelayUntil(&startTimePoint, args->periodMs);
     }
 }
 
-void vTaskBusyWork(void *pvParameters)
+void wakeup(bool *wakeupCall)
 {
-    const TaskArgs *args = pvParameters;
+    *wakeupCall = true;
+}
 
-    vTaskDelay(pdMS_TO_TICKS(args->releaseTimeMs));
-
-    TickType_t startTimePoint = xTaskGetTickCount();
+void producer(void *parameters)
+{
+    const ProducerArgs *args = parameters;
 
     while (true)
     {
-        xSemaphoreTake(g_printMutex, portMAX_DELAY);
-        uartPuts("Task ");
-        uartPuts(args->name);
-        uartPuts(" started\r\n");
-        xSemaphoreGive(g_printMutex);
-
-        xSemaphoreTake(g_printMutex, portMAX_DELAY);
-        uartPuts("Task ");
-        uartPuts(args->name);
-        uartPuts(" started its workload\r\n");
-        xSemaphoreGive(g_printMutex);
-
-        volatile int i = 0;
-        while (i < WAIT_ITERATIONS)
+        uartPuts("Producer at start of while!\r\n");
+        uint8_t byte = produceByte();
+        assert(args->buffer->size <= args->buffer->capacity);
+        // Spin until it's possible to add to buffer.
+        if (args->buffer->size == args->buffer->capacity)
         {
-            i++;
+            uartPuts("Producer going to sleep!\r\n");
+            sleep(args->producerRunnable);
+            uartPuts("Producer woke up!\r\n");
+
         }
 
-        xSemaphoreTake(g_printMutex, portMAX_DELAY);
-        uartPuts("Task ");
-        uartPuts(args->name);
-        uartPuts(" finished\r\n");
-        xSemaphoreGive(g_printMutex);
+        putByteIntoBuffer(args->buffer, byte);
+        uint16_t oldSize = args->buffer->size;
+//        taskYIELD();
+        uint16_t newSize = args->buffer->size;
+        assert(oldSize == newSize);
+        args->buffer->size = oldSize + 1;
 
-        TickType_t currentTimePoint = xTaskGetTickCount();
-        TickType_t expectedTimePoint = startTimePoint
-                + pdMS_TO_TICKS(args->periodMs);
-        int32_t difference = (int32_t) currentTimePoint
-                - (int32_t) expectedTimePoint;
-        if (difference > 0)
+        if (args->buffer->size == 1)
         {
-            xSemaphoreTake(g_printMutex, portMAX_DELAY);
-            uartPuts("Task ");
-            uartPuts(args->name);
-            uartPuts(" missed its deadline by ");
+            uartPuts("Producer waking up consumer!\r\n");
+            wakeup(args->consumerRunnable);
+        }
+        uartPuts("Producer at end of while!\r\n");
+    }
+}
 
-            char buf[30] = { 0 };
-            sprintf(buf, "%d", difference);
-            uartPuts(buf);
-            uartPuts("ms\r\n");
+void consumeByte(uint8_t byte)
+{
+    // TODO: Visualize with UART.
+    return;
+}
 
-            xSemaphoreGive(g_printMutex);
+void consumer(void *parameters)
+{
+    const ConsumerArgs *args = parameters;
+
+    while (true)
+    {
+        uartPuts("Consumer at start of while!\r\n");
+        if (args->buffer->size == 0)
+        {
+
+            uartPuts("Consumer going to sleep!\r\n");
+
+            sleep(args->consumerRunnable);
+
+            uartPuts("Consumer woke up!\r\n");
+
+        }
+        assert(args->buffer->size != 0);
+        uint8_t byte = removeByteFromBuffer(args->buffer);
+
+        uint16_t oldSize = args->buffer->size;
+        taskYIELD();
+        uint16_t newSize = args->buffer->size;
+        assert(oldSize == newSize);
+        args->buffer->size = oldSize - 1;
+
+        assert(args->buffer->size <= args->buffer->capacity);
+        if (args->buffer->size == args->buffer->capacity - 1)
+        {
+
+            uartPuts("Consumer waking up producer!\r\n");
+
+            wakeup(args->producerRunnable);
         }
 
-        vTaskDelayUntil(&startTimePoint, pdMS_TO_TICKS(args->periodMs));
+        consumeByte(byte);
+        uartPuts("Consumer at end of while!\r\n");
     }
 }
 
@@ -207,46 +201,44 @@ int main(void)
     SysCtlClockFreqSet(
     SYSCTL_XTAL_25MHZ | SYSCTL_OSC_MAIN | SYSCTL_USE_PLL | SYSCTL_CFG_VCO_480,
                        SYSTEM_CLOCK);
+    g_printMutex = xSemaphoreCreateMutex();
 
     clearScreenAndMoveCursorHome();
 
     uartPuts("\r\nStarting new run\r\n");
 
-    // Create mutexes and binaries
-    SemaphoreHandle_t mutex = xSemaphoreCreateCounting(1, 1);
-    assert(mutex);
-
-    g_printMutex = xSemaphoreCreateMutex();
 
     const uint16_t taskStackDepth = 1000;
-    const UBaseType_t lowPrio = tskIDLE_PRIORITY + 1;
-    const UBaseType_t mediumPrio = tskIDLE_PRIORITY + 2;
-    const UBaseType_t highPrio = tskIDLE_PRIORITY + 3;
+    const UBaseType_t priority = tskIDLE_PRIORITY + 1;
+
+    enum
+    {
+        BUFFER_CAPACITY = 100
+    };
+    uint8_t bufferData[BUFFER_CAPACITY] = { 0 };
+    static Buffer buffer;
+    buffer = (Buffer ) { .data = bufferData, .capacity = BUFFER_CAPACITY };
+    static bool consumerRunnable = false;
+    static bool producerRunnable = true;
 
     // Construct task arguments as static variables to make sure they outlive the tasks.
-    static TaskArgs lowPriorityArgs;
-    lowPriorityArgs = (TaskArgs ) { .mutex = mutex, .releaseTimeMs = 0,
-                                    .periodMs = 4000, .name = "low" };
+    static ProducerArgs producerArgs;
+    producerArgs = (ProducerArgs ) { .buffer = &buffer, .consumerRunnable =
+                                             &consumerRunnable,
+                                     .producerRunnable = &producerRunnable };
 
-    static TaskArgs mediumPriorityArgs;
-    mediumPriorityArgs = (TaskArgs ) { .mutex = mutex, .releaseTimeMs = 400,
-                                       .periodMs = 4000, .name = "mid" };
-
-    static TaskArgs highPriorityArgs;
-    highPriorityArgs = (TaskArgs ) { .mutex = mutex, .releaseTimeMs = 200,
-                                     .periodMs = 4000, .name = "high" };
+    static ConsumerArgs consumerArgs;
+    consumerArgs = (ConsumerArgs ) { .buffer = &buffer, .consumerRunnable =
+                                             &consumerRunnable,
+                                     .producerRunnable = &producerRunnable };
 
     BaseType_t result;
-    result = xTaskCreate(vTaskTakeMutex, "LowPrioTask", taskStackDepth,
-                         &lowPriorityArgs, lowPrio, NULL);
+    result = xTaskCreate(consumer, "consumer", taskStackDepth, &consumerArgs,
+                         priority, NULL);
     assert(result == pdPASS);
 
-    result = xTaskCreate(vTaskBusyWork, "MidPrioTask", taskStackDepth,
-                         &mediumPriorityArgs, mediumPrio, NULL);
-    assert(result == pdPASS);
-
-    result = xTaskCreate(vTaskTakeMutex, "HighPrioTask", taskStackDepth,
-                         &highPriorityArgs, highPrio, NULL);
+    result = xTaskCreate(producer, "producer", taskStackDepth, &producerArgs,
+                         priority, NULL);
     assert(result == pdPASS);
 
     // Start the scheduler with vTaskStartScheduler

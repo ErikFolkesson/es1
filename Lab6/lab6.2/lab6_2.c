@@ -6,6 +6,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <ctype.h>
 #include <stdio.h>
 
 #include "driverlib/gpio.h"
@@ -16,8 +17,6 @@
 #include "driverlib/interrupt.h"
 #include "driverlib/uart.h"
 #include "inc/tm4c129encpdt.h"
-
-#define WAIT_ITERATIONS 10000000
 
 SemaphoreHandle_t g_printMutex;
 
@@ -45,142 +44,62 @@ void ConfigureUART(void)
 
 void uartPuts(const char *str)
 {
-    xSemaphoreTake(g_printMutex, portMAX_DELAY);
     const char *it;
     for (it = str; *it != '\0'; it++)
     {
         UARTCharPut(UART0_BASE, *it);
     }
-    xSemaphoreGive(g_printMutex);
 }
 
-typedef struct
-{
-    uint8_t *data;
-    uint16_t size;
-    uint16_t capacity;
-} Buffer;
+enum {
+    BUF_CAPACITY = 15
+};
 
-typedef struct
-{
-    SemaphoreHandle_t *emptySlots;
-    SemaphoreHandle_t *filledSlots;
-    SemaphoreHandle_t *bufferMutex;
-    Buffer *buffer;
-} Args;
-
-uint8_t produceByte(void)
-{
-    // TODO: Visualize with UART.
-    return '|';
-}
-
-void putByteIntoBuffer(Buffer *buffer, uint8_t byte)
-{
-    assert(buffer->size <= buffer->capacity);
-    buffer->data[buffer->size] = byte;
-}
-
-uint8_t removeByteFromBuffer(Buffer *buffer)
-{
-    return buffer->data[buffer->size - 1];
-}
-
-void sleep(bool *wakeupCall)
-{
-    *wakeupCall = false;
-    // Spin until the bool changes from elsewhere.
-    while (!*wakeupCall)
-    {
-    }
-}
-
-void wakeup(bool *wakeupCall)
-{
-    *wakeupCall = true;
-}
-
-void producer(void *parameters)
-{
-    const Args *args = parameters;
-
-    while (true)
-    {
-        uartPuts("Producer at start of while!\r\n");
-        uint8_t byte = produceByte();
-        assert(args->buffer->size <= args->buffer->capacity);
-
-        xSemaphoreTake(args->emptySlots, portMAX_DELAY);
-
-        assert(args->buffer->size <= args->buffer->capacity);
-
-        xSemaphoreTake(args->bufferMutex, portMAX_DELAY);
-
-        assert(args->buffer->size <= args->buffer->capacity);
-
-        putByteIntoBuffer(args->buffer, byte);
-        uint16_t oldSize = args->buffer->size;
-//        taskYIELD();
-        uint16_t newSize = args->buffer->size;
-        assert(oldSize == newSize);
-        args->buffer->size = oldSize + 1;
-
-        assert(args->buffer->size <= args->buffer->capacity);
-        xSemaphoreGive(args->bufferMutex);
-        assert(args->buffer->size <= args->buffer->capacity);
-
-        xSemaphoreGive(args->filledSlots);
-        assert(args->buffer->size <= args->buffer->capacity);
-
-        assert(args->buffer->size <= args->buffer->capacity);
-
-        uartPuts("Producer at end of while!\r\n");
-    }
-}
-
-void consumeByte(uint8_t byte)
-{
-    // TODO: Visualize with UART.
-    return;
-}
-
-void consumer(void *parameters)
-{
-    const Args *args = parameters;
-
-    while (true)
-    {
-        uartPuts("Consumer at start of while!\r\n");
-        assert(args->buffer->size <= args->buffer->capacity);
-        xSemaphoreTake(args->filledSlots, portMAX_DELAY);
-        assert(args->buffer->size <= args->buffer->capacity);
-        xSemaphoreTake(args->bufferMutex, portMAX_DELAY);
-        assert(args->buffer->size <= args->buffer->capacity);
-        uint8_t byte = removeByteFromBuffer(args->buffer);
-
-        uint16_t oldSize = args->buffer->size;
-        taskYIELD();
-        uint16_t newSize = args->buffer->size;
-        assert(oldSize == newSize);
-        args->buffer->size = oldSize - 1;
-        assert(args->buffer->size <= args->buffer->capacity);
-        xSemaphoreGive(args->bufferMutex);
-        assert(args->buffer->size <= args->buffer->capacity);
-        xSemaphoreGive(args->emptySlots);
-
-        assert(args->buffer->size <= args->buffer->capacity);
-
-        consumeByte(byte);
-
-        uartPuts("Consumer at end of while!\r\n");
-    }
-}
+char buf[BUF_CAPACITY + 1];
+int bufSize;
+int totalCharacterCount;
 
 // Prints the ANSI escape sequence to move the cursor to the home position (1,1)
 void clearScreenAndMoveCursorHome(void)
 {
     uartPuts("\x1B[2J");
     uartPuts("\x1B[H");
+}
+
+// If the call needs to be thread-safe, the caller is responsible for locking a mutex.
+void printUartData(void) {
+    clearScreenAndMoveCursorHome();
+    uartPuts(buf);
+    // TODO: poll status semaphore.
+}
+
+// Rotates te element in the buffer one step to the left, with the first character moving to the last position.
+void rotateLeft(char*buf, int bufSize) {
+    char tmp = *buf;
+    for (int i = 1; i < bufSize; i++) {
+        buf[i - 1] = buf[i];
+    }
+    buf[bufSize - 1] = tmp;
+}
+
+void uartTask(void* parameters) {
+    while (true) {
+        int32_t c = UARTCharGet(UART0_BASE);
+        if (!isprint(c)) {
+            continue;
+        }
+        xSemaphoreTake(g_printMutex, portMAX_DELAY);
+
+        if (bufSize == BUF_CAPACITY) {
+            rotateLeft(buf, bufSize);
+            buf[bufSize - 1] = c;
+        } else {
+            buf[bufSize] = c;
+            bufSize++;
+        }
+        printUartData();
+        xSemaphoreGive(g_printMutex);
+    }
 }
 
 int main(void)
@@ -195,40 +114,13 @@ int main(void)
 
     clearScreenAndMoveCursorHome();
 
-    uartPuts("\r\nStarting new run\r\n");
-
     const uint16_t taskStackDepth = 1000;
     const UBaseType_t priority = tskIDLE_PRIORITY + 1;
 
-    enum
-    {
-        BUFFER_CAPACITY = 100
-    };
-    uint8_t bufferData[BUFFER_CAPACITY] = { 0 };
-    static Buffer buffer;
-    buffer = (Buffer ) { .data = bufferData, .capacity = BUFFER_CAPACITY };
-    static SemaphoreHandle_t emptySlots;
-    emptySlots = xSemaphoreCreateCounting(
-            BUFFER_CAPACITY, BUFFER_CAPACITY);
-    static SemaphoreHandle_t filledSlots;
-    filledSlots = xSemaphoreCreateCounting(
-            BUFFER_CAPACITY, 0);
-    static SemaphoreHandle_t bufferMutex;
-    bufferMutex = xSemaphoreCreateMutex();
-
-    // Construct task arguments as static variables to make sure they outlive the tasks.
-    static Args args;
-    args = (Args )
-            { .buffer = &buffer, .emptySlots = emptySlots, .filledSlots =
-                      filledSlots,
-              .bufferMutex = bufferMutex };
+    int a = 4;
 
     BaseType_t result;
-    result = xTaskCreate(consumer, "consumer", taskStackDepth, &args, priority,
-                         NULL);
-    assert(result == pdPASS);
-
-    result = xTaskCreate(producer, "producer", taskStackDepth, &args, priority,
+    result = xTaskCreate(uartTask, "uarttask", taskStackDepth, &a, priority,
                          NULL);
     assert(result == pdPASS);
 

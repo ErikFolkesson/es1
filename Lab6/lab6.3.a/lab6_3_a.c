@@ -162,7 +162,7 @@ void ADCSetup()
     // ADC_CTL_END: This step is the last in the sequence.
     // ADC_CTL_IE: When this step is complete, it will cause an interrupt.
     ADCSequenceStepConfigure(JOY_ADC_BASE, ADC_MICROPHONE_SEQ_NUM, 0,
-                             ADC_HOR_JOY_CH | ADC_CTL_END | ADC_CTL_IE);
+                             ADC_MICROPHONE_CH | ADC_CTL_END | ADC_CTL_IE);
 
     ADCSequenceEnable(JOY_ADC_BASE, ADC_JOY_SEQ_NUM);
     ADCSequenceEnable(JOY_ADC_BASE, ADC_ACCEL_SEQ_NUM);

@@ -318,10 +318,16 @@ void micTask(void *parameters)
     while (true)
     {
         uint32_t reading = readMicrophone();
-        uint32_t db = 20 * log(reading);
 
-//        xQueueSend(args->readingQueue, &db, portMAX_DELAY);
-        xQueueSend(args->readingQueue, &reading, portMAX_DELAY);
+        uint32_t baseline = 3;
+        uint32_t baselineDb = 60;
+
+//        uint32_t db = 20 * log10(abs((double) reading / baseline)) + baselineDb;
+        // Attempt at converting to decibel, but we can't really find information about how do to it properly.
+        uint32_t db = abs(reading - 2050);
+        db = 60 + 20 * log10(db / 3);
+
+        xQueueSend(args->readingQueue, &db, portMAX_DELAY);
 
         vTaskDelayUntil(&startTimePoint, args->periodInTicks);
     }
@@ -353,31 +359,58 @@ void gatekeepTask(void *parameters)
 
     while (true)
     {
-        JoystickReading joyReading;
-        xQueueReceive(args->joyQueue, &joyReading, portMAX_DELAY);
-        AccelReading accelReading;
-        xQueueReceive(args->accelQueue, &accelReading, portMAX_DELAY);
-        uint32_t micReading;
-        xQueueReceive(args->micQueue, &micReading, portMAX_DELAY);
+        int32_t micAverage = 0;
+        for (int i = 0; i < 8; i++)
+        {
+            uint32_t micReading;
+            xQueueReceive(args->micQueue, &micReading, portMAX_DELAY);
+            micAverage += micReading;
+        }
+        micAverage /= 8;
+
+        JoystickReading joyAverage = { 0 };
+        for (int i = 0; i < 4; i++)
+        {
+            JoystickReading joyReading;
+            xQueueReceive(args->joyQueue, &joyReading, portMAX_DELAY);
+            joyAverage.horizontal += joyReading.horizontal;
+            joyAverage.vertical += joyReading.vertical;
+        }
+        joyAverage.horizontal /= 4;
+        joyAverage.vertical /= 4;
+
+        AccelReading accelAverage = { 0 };
+        for (int i = 0; i < 2; i++)
+        {
+
+            AccelReading accelReading;
+            xQueueReceive(args->accelQueue, &accelReading, portMAX_DELAY);
+            accelAverage.x += accelReading.x;
+            accelAverage.y += accelReading.y;
+            accelAverage.z += accelReading.z;
+        }
+        accelAverage.x /= 2;
+        accelAverage.y /= 2;
+        accelAverage.z /= 2;
 
         clearScreenAndMoveCursorHome();
         uartPuts("Joy: hor(");
-        uartPrintInt(joyReading.horizontal);
-        uartPuts(") ver(");;
-        uartPrintInt(joyReading.vertical);
+        uartPrintInt(joyAverage.horizontal);
+        uartPuts(") ver(");
+        uartPrintInt(joyAverage.vertical);
         uartPuts(")\r\n");
 
         uartPuts("Accel: x(");
 
-        uartPrintInt(accelReading.x);
+        uartPrintInt(accelAverage.x);
         uartPuts(") y(");
-        uartPrintInt(accelReading.y);
+        uartPrintInt(accelAverage.y);
         uartPuts(") z(");
-        uartPrintInt(accelReading.z);
+        uartPrintInt(accelAverage.z);
         uartPuts(")\r\n");
 
         uartPuts("Mic: ");
-        uartPrintInt(micReading);
+        uartPrintInt(micAverage);
         uartPuts("\r\n");
 
         vTaskDelayUntil(&startTimePoint, args->periodInTicks);
@@ -410,19 +443,19 @@ int main(void)
     const UBaseType_t taskPrio = tskIDLE_PRIORITY + 1;
 
     static AccelTaskArgs accelArgs;
-    accelArgs = (AccelTaskArgs ) { .periodInTicks = pdMS_TO_TICKS(100),
+    accelArgs = (AccelTaskArgs ) { .periodInTicks = pdMS_TO_TICKS(20),
                                    .readingQueue = accelerometerQueue,
                                    .releaseTick = pdMS_TO_TICKS(500) };
     static MicTaskArgs micArgs;
-    micArgs = (MicTaskArgs ) { .periodInTicks = pdMS_TO_TICKS(100),
+    micArgs = (MicTaskArgs ) { .periodInTicks = pdMS_TO_TICKS(5),
                                .readingQueue = microphoneQueue, .releaseTick =
                                        pdMS_TO_TICKS(500) };
     static JoyTaskArgs joyArgs;
-    joyArgs = (JoyTaskArgs ) { .periodInTicks = pdMS_TO_TICKS(100),
+    joyArgs = (JoyTaskArgs ) { .periodInTicks = pdMS_TO_TICKS(10),
                                .readingQueue = joyQueue, .releaseTick =
                                        pdMS_TO_TICKS(500) };
     static GatekeepTaskArgs gatekeepArgs;
-    gatekeepArgs = (GatekeepTaskArgs ) { .periodInTicks = pdMS_TO_TICKS(100),
+    gatekeepArgs = (GatekeepTaskArgs ) { .periodInTicks = pdMS_TO_TICKS(40),
                                          .accelQueue = accelerometerQueue,
                                          .joyQueue = joyQueue, .micQueue =
                                                  microphoneQueue,

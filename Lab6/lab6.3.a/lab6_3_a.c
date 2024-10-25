@@ -191,11 +191,11 @@ JoystickReading readJoystick()
     {
     }
 
-    uint32_t buffer[2] = {0};
+    uint32_t buffer[4] = { 0 };
 
     int32_t samplesRead = ADCSequenceDataGet(JOY_ADC_BASE, ADC_JOY_SEQ_NUM,
                                              buffer); // 0 lowest | 1450-1950 middle | 4000 higher
-    assert(samplesRead == 2 || samplesRead == 1 || samplesRead == 0);
+    assert(samplesRead >= 0 && samplesRead <= 4);
 
     JoystickReading ret = { .horizontal = buffer[0], .vertical = buffer[1] };
     return ret;
@@ -221,7 +221,7 @@ uint32_t readMicrophone()
 
     int32_t samplesRead = ADCSequenceDataGet(JOY_ADC_BASE,
                                              ADC_MICROPHONE_SEQ_NUM, &buffer); // 0 lowest | 1450-1950 middle | 4000 higher
-    assert(samplesRead == 1);
+    assert(samplesRead == 1 || samplesRead == 0);
 
     return buffer;
 }
@@ -249,11 +249,11 @@ AccelReading readAccel()
     {
     }
 
-    uint32_t buffer[3];
+    uint32_t buffer[4] = { 0 };
 
     int32_t samplesRead = ADCSequenceDataGet(JOY_ADC_BASE, ADC_ACCEL_SEQ_NUM,
                                              buffer); // 0 lowest | 1450-1950 middle | 4000 higher
-    assert(samplesRead == 3);
+    assert(samplesRead >= 0 && samplesRead <= 4); // FIXME: If 4 samples are read, the fourth one is probably another x value. Probably just have to push the read samples to a queue and keep track of x/y/z using the order.
 
     AccelReading ret = { .x = buffer[0], .y = buffer[1], .z = buffer[2] };
     return ret;

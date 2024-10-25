@@ -146,7 +146,7 @@ void buttonTask(void *parameters)
         uint8_t delta;
         uint8_t state = ButtonsPoll(&delta, 0);
 
-        if (BUTTON_PRESSED(LEFT_BUTTON, state, delta))
+        if (BUTTON_PRESSED(LEFT_BUTTON, state, delta) || BUTTON_PRESSED(RIGHT_BUTTON, state, delta))
         {
             // During the ten seconds the status task should be shown, a semaphore is raised.
             xSemaphoreGive(g_statusSemaphore);

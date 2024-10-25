@@ -77,7 +77,6 @@ typedef struct
 
 uint8_t produceByte(void)
 {
-    // TODO: Visualize with UART.
     return '|';
 }
 
@@ -125,11 +124,8 @@ void producer(void *parameters)
         }
 
         putByteIntoBuffer(args->buffer, byte);
-        uint16_t oldSize = args->buffer->size;
-//        taskYIELD();
-        uint16_t newSize = args->buffer->size;
-        assert(oldSize == newSize);
-        args->buffer->size = oldSize + 1;
+
+        args->buffer->size += 1;
 
         if (args->buffer->size == 1)
         {
@@ -142,7 +138,6 @@ void producer(void *parameters)
 
 void consumeByte(uint8_t byte)
 {
-    // TODO: Visualize with UART.
     return;
 }
 
@@ -169,7 +164,8 @@ void consumer(void *parameters)
         uint16_t oldSize = args->buffer->size;
         taskYIELD();
         uint16_t newSize = args->buffer->size;
-        assert(oldSize == newSize);
+        assert(oldSize == newSize); // Check if the size was modified while yielding.
+
         args->buffer->size = oldSize - 1;
 
         assert(args->buffer->size <= args->buffer->capacity);

@@ -71,7 +71,6 @@ typedef struct
 
 uint8_t produceByte(void)
 {
-    // TODO: Visualize with UART.
     return '|';
 }
 
@@ -119,11 +118,8 @@ void producer(void *parameters)
         assert(args->buffer->size <= args->buffer->capacity);
 
         putByteIntoBuffer(args->buffer, byte);
-        uint16_t oldSize = args->buffer->size;
-//        taskYIELD();
-        uint16_t newSize = args->buffer->size;
-        assert(oldSize == newSize);
-        args->buffer->size = oldSize + 1;
+
+        args->buffer->size += 1;
 
         assert(args->buffer->size <= args->buffer->capacity);
         xSemaphoreGive(args->bufferMutex);
@@ -140,7 +136,6 @@ void producer(void *parameters)
 
 void consumeByte(uint8_t byte)
 {
-    // TODO: Visualize with UART.
     return;
 }
 
@@ -151,17 +146,20 @@ void consumer(void *parameters)
     while (true)
     {
         uartPuts("Consumer at start of while!\r\n");
+
         assert(args->buffer->size <= args->buffer->capacity);
         xSemaphoreTake(args->filledSlots, portMAX_DELAY);
         assert(args->buffer->size <= args->buffer->capacity);
         xSemaphoreTake(args->bufferMutex, portMAX_DELAY);
         assert(args->buffer->size <= args->buffer->capacity);
+
         uint8_t byte = removeByteFromBuffer(args->buffer);
 
         uint16_t oldSize = args->buffer->size;
         taskYIELD();
         uint16_t newSize = args->buffer->size;
-        assert(oldSize == newSize);
+        assert(oldSize == newSize); // Check if the yield caused a context switch which modified the buffer.
+
         args->buffer->size = oldSize - 1;
         assert(args->buffer->size <= args->buffer->capacity);
         xSemaphoreGive(args->bufferMutex);

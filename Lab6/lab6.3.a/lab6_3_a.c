@@ -20,9 +20,6 @@
 #include "inc/tm4c129encpdt.h"
 #include "driverlib/adc.h"
 
-SemaphoreHandle_t g_printMutex;
-SemaphoreHandle_t g_statusSemaphore;
-
 void ConfigureUART(void)
 {
     SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOA);
@@ -70,35 +67,25 @@ void uartPrintInt(int number)
     UARTCharPut(UART0_BASE, oneDigit);
 }
 
-// PINS WE NEEED TO ENABLE
-// PE4 for horizontal joystick | channel 9
-// PE3 for vertical joystick   | channel 0
-
-// PE0 accelerometer x         | channel 3
-// PE1 y                       | channel 2
-// PE2 z                       | channel 1
-
-// PE5 microphone              | channel 8
-
 enum
 {
     ADC_JOY_SEQ_NUM = 2, // Sequence 2 samples four values.
 
-    ADC_MICROPHONE_SEQ_NUM = 3, // Sequence 3 samples 1 values.
+    ADC_MIC_SEQ_NUM = 3, // Sequence 3 samples 1 values.
 
     ADC_ACCEL_SEQ_NUM = 1, // Sequence 1 sampler four values.
 
-    JOY_ADC_BASE = ADC0_BASE,
+    ADC_BASE = ADC0_BASE,
 
     ADC_HOR_JOY_CH = ADC_CTL_CH9, // The pin for horizontal movement (PE4) is connected to channel 9 (AIN9).
-    ADC_VER_JOY_CH = ADC_CTL_CH0, // The pin for vertical movement (PE4) is connected to channel 9 (AIN9).
+    ADC_VER_JOY_CH = ADC_CTL_CH0, // Same logic as above.
     ADC_ACCEL_X_CH = ADC_CTL_CH3,
     ADC_ACCEL_Y_CH = ADC_CTL_CH2,
     ADC_ACCEL_Z_CH = ADC_CTL_CH1,
     ADC_MICROPHONE_CH = ADC_CTL_CH8,
 
     ADC_HIGHEST_PRIO = 0,
-    ADC_PERIPH = SYSCTL_PERIPH_ADC0, // FIXME: Figure out if ADC0 works for everything or if we also need to use ADC1.
+    ADC_PERIPH = SYSCTL_PERIPH_ADC0,
     ADC_GPIO_PORT_PERIPH = SYSCTL_PERIPH_GPIOE,
     ADC_GPIO_PORT_BASE = GPIO_PORTE_BASE,
 
@@ -108,14 +95,11 @@ enum
     ADC_GPIO_ACCEL_Y = GPIO_PIN_1,
     ADC_GPIO_ACCEL_Z = GPIO_PIN_2,
     ADC_GPIO_MICROPHONE = GPIO_PIN_5,
-
-    ADC_STEP = 0, // For JOY_ADC_SEQ_NUM = 3, the only valid step is step 0.
 };
 
 // Initializes the necessary ports/pins and sets up an ADC sequencer (JOY_ADC_SEQ_NUM) ready for sampling.
 void ADCSetup()
 {
-
     // Enable the ADC peripheral port
     SysCtlPeripheralEnable(ADC_PERIPH);
 
@@ -135,38 +119,39 @@ void ADCSetup()
             | ADC_GPIO_MICROPHONE;
     GPIOPinTypeADC(ADC_GPIO_PORT_BASE, pins);
 
-    // ADC_TRIGGER_PROCESSOR is used to allows us to trigger the reading of the joystick using the ADCProcessorTrigger function.
-    ADCSequenceConfigure(JOY_ADC_BASE, ADC_JOY_SEQ_NUM, ADC_TRIGGER_PROCESSOR,
+    // Turn on the different sequencers we use.
+    // ADC_TRIGGER_PROCESSOR is used to allows us to trigger the reading of the peripheral using the ADCProcessorTrigger function.
+    ADCSequenceConfigure(ADC_BASE, ADC_JOY_SEQ_NUM, ADC_TRIGGER_PROCESSOR,
                          ADC_HIGHEST_PRIO);
-    ADCSequenceConfigure(JOY_ADC_BASE, ADC_MICROPHONE_SEQ_NUM,
-    ADC_TRIGGER_PROCESSOR,
+    ADCSequenceConfigure(ADC_BASE, ADC_MIC_SEQ_NUM, ADC_TRIGGER_PROCESSOR,
                          ADC_HIGHEST_PRIO);
-    ADCSequenceConfigure(JOY_ADC_BASE, ADC_ACCEL_SEQ_NUM, ADC_TRIGGER_PROCESSOR,
+    ADCSequenceConfigure(ADC_BASE, ADC_ACCEL_SEQ_NUM, ADC_TRIGGER_PROCESSOR,
                          ADC_HIGHEST_PRIO);
 
+    // Configure steps for both vertical and horizontal joystick.
     // ADC_CTL_END: This step is the last in the sequence.
     // ADC_CTL_IE: When this step is complete, it will cause an interrupt.
-    ADCSequenceStepConfigure(JOY_ADC_BASE, ADC_JOY_SEQ_NUM, 0,
-                             ADC_HOR_JOY_CH);
-    ADCSequenceStepConfigure(JOY_ADC_BASE, ADC_JOY_SEQ_NUM, 1,
+    ADCSequenceStepConfigure(ADC_BASE, ADC_JOY_SEQ_NUM, 0, ADC_HOR_JOY_CH);
+    ADCSequenceStepConfigure(ADC_BASE, ADC_JOY_SEQ_NUM, 1,
                              ADC_VER_JOY_CH | ADC_CTL_END | ADC_CTL_IE);
 
+    // Configure steps for the accelerometer's x, y, and z.
     // ADC_CTL_END: This step is the last in the sequence.
     // ADC_CTL_IE: When this step is complete, it will cause an interrupt.
-    ADCSequenceStepConfigure(JOY_ADC_BASE, ADC_ACCEL_SEQ_NUM, 0,
-                             ADC_ACCEL_X_CH);
-    ADCSequenceStepConfigure(JOY_ADC_BASE, ADC_ACCEL_SEQ_NUM, 1,
-                             ADC_ACCEL_Y_CH);
-    ADCSequenceStepConfigure(JOY_ADC_BASE, ADC_ACCEL_SEQ_NUM, 2,
+    ADCSequenceStepConfigure(ADC_BASE, ADC_ACCEL_SEQ_NUM, 0, ADC_ACCEL_X_CH);
+    ADCSequenceStepConfigure(ADC_BASE, ADC_ACCEL_SEQ_NUM, 1, ADC_ACCEL_Y_CH);
+    ADCSequenceStepConfigure(ADC_BASE, ADC_ACCEL_SEQ_NUM, 2,
                              ADC_ACCEL_Z_CH | ADC_CTL_END | ADC_CTL_IE);
+
+    // Configure a step for the microphone.
     // ADC_CTL_END: This step is the last in the sequence.
     // ADC_CTL_IE: When this step is complete, it will cause an interrupt.
-    ADCSequenceStepConfigure(JOY_ADC_BASE, ADC_MICROPHONE_SEQ_NUM, 0,
+    ADCSequenceStepConfigure(ADC_BASE, ADC_MIC_SEQ_NUM, 0,
                              ADC_MICROPHONE_CH | ADC_CTL_END | ADC_CTL_IE);
 
-    ADCSequenceEnable(JOY_ADC_BASE, ADC_JOY_SEQ_NUM);
-    ADCSequenceEnable(JOY_ADC_BASE, ADC_ACCEL_SEQ_NUM);
-    ADCSequenceEnable(JOY_ADC_BASE, ADC_MICROPHONE_SEQ_NUM);
+    ADCSequenceEnable(ADC_BASE, ADC_JOY_SEQ_NUM);
+    ADCSequenceEnable(ADC_BASE, ADC_ACCEL_SEQ_NUM);
+    ADCSequenceEnable(ADC_BASE, ADC_MIC_SEQ_NUM);
 }
 
 typedef struct
@@ -180,47 +165,52 @@ JoystickReading readJoystick()
 {
     enum
     {
-        ADC_READ_VALUE_INTERRUPT = ADC_INT_SS2, // SS2 = sample sequence 2.
+        ADC_READ_VALUE_INTERRUPT = ADC_INT_SS2, // SS2 = sample sequence 2, can read up to 4 samples.
     };
 
-    ADCProcessorTrigger(JOY_ADC_BASE, ADC_JOY_SEQ_NUM);
-
-    // Wait until the interrupt sampling the joystick value has completed.
-    while (ADC_READ_VALUE_INTERRUPT
-            & ADCIntStatus(JOY_ADC_BASE, ADC_JOY_SEQ_NUM, true))
-    {
-    }
-
+    int32_t samplesRead;
     uint32_t buffer[4] = { 0 };
+    do
+    {
+        ADCProcessorTrigger(ADC_BASE, ADC_JOY_SEQ_NUM);
 
-    int32_t samplesRead = ADCSequenceDataGet(JOY_ADC_BASE, ADC_JOY_SEQ_NUM,
-                                             buffer); // 0 lowest | 1450-1950 middle | 4000 higher
-    assert(samplesRead >= 0 && samplesRead <= 4);
+        // Wait until the interrupt sampling the joystick value has completed.
+        while (ADC_READ_VALUE_INTERRUPT
+                & ADCIntStatus(ADC_BASE, ADC_JOY_SEQ_NUM, true))
+        {
+        }
+
+        samplesRead = ADCSequenceDataGet(ADC_BASE, ADC_JOY_SEQ_NUM, buffer); // 0 lowest | 1450-1950 middle | 4000 higher
+        assert(samplesRead >= 0 && samplesRead <= 4);
+    }
+    while (samplesRead < 2);
+    // The above do-while loop technically discards legitimate readings, but doesn't require us to implement a queue.
+    // It also assumes that whenever two sampler are read, the first is the horizontal value and the second is the vertical.
 
     JoystickReading ret = { .horizontal = buffer[0], .vertical = buffer[1] };
     return ret;
 }
 
-// Reads the current value of the joystick. The value will be in about in the range [0, 4000].
+// Reads the current value of the microphone.
 uint32_t readMicrophone()
 {
     enum
     {
-        ADC_READ_VALUE_INTERRUPT = ADC_INT_SS3, // SS3 = sample sequence 3.
+        ADC_READ_VALUE_INTERRUPT = ADC_INT_SS3, // SS3 = sample sequence 3, can read a single sample.
     };
 
-    ADCProcessorTrigger(JOY_ADC_BASE, ADC_MICROPHONE_SEQ_NUM);
+    ADCProcessorTrigger(ADC_BASE, ADC_MIC_SEQ_NUM);
 
-    // Wait until the interrupt sampling the joystick value has completed.
+    // Wait until the interrupt sampling the microphone value has completed.
     while (ADC_READ_VALUE_INTERRUPT
-            & ADCIntStatus(JOY_ADC_BASE, ADC_MICROPHONE_SEQ_NUM, true))
+            & ADCIntStatus(ADC_BASE, ADC_MIC_SEQ_NUM, true))
     {
     }
 
     uint32_t buffer;
 
-    int32_t samplesRead = ADCSequenceDataGet(JOY_ADC_BASE,
-                                             ADC_MICROPHONE_SEQ_NUM, &buffer); // 0 lowest | 1450-1950 middle | 4000 higher
+    int32_t samplesRead = ADCSequenceDataGet(ADC_BASE, ADC_MIC_SEQ_NUM,
+                                             &buffer);
     assert(samplesRead == 1 || samplesRead == 0);
 
     return buffer;
@@ -233,27 +223,31 @@ typedef struct
     uint32_t z;
 } AccelReading;
 
-// Reads the current value of the joystick. The value will be in about in the range [0, 4000].
+// Reads the current value of the accelerometer.
 AccelReading readAccel()
 {
     enum
     {
-        ADC_READ_VALUE_INTERRUPT = ADC_INT_SS1, // SS1 = sample sequence 1.
+        ADC_READ_VALUE_INTERRUPT = ADC_INT_SS1, // SS1 = sample sequence 1, can read up to 4 samples.
     };
-
-    ADCProcessorTrigger(JOY_ADC_BASE, ADC_ACCEL_SEQ_NUM);
-
-    // Wait until the interrupt sampling the joystick value has completed.
-    while (ADC_READ_VALUE_INTERRUPT
-            & ADCIntStatus(JOY_ADC_BASE, ADC_ACCEL_SEQ_NUM, true))
-    {
-    }
-
     uint32_t buffer[4] = { 0 };
+    int32_t samplesRead;
+    do
+    {
+        ADCProcessorTrigger(ADC_BASE, ADC_ACCEL_SEQ_NUM);
 
-    int32_t samplesRead = ADCSequenceDataGet(JOY_ADC_BASE, ADC_ACCEL_SEQ_NUM,
-                                             buffer); // 0 lowest | 1450-1950 middle | 4000 higher
-    assert(samplesRead >= 0 && samplesRead <= 4); // FIXME: If 4 samples are read, the fourth one is probably another x value. Probably just have to push the read samples to a queue and keep track of x/y/z using the order.
+        // Wait until the interrupt sampling the accelerometer value has completed.
+        while (ADC_READ_VALUE_INTERRUPT
+                & ADCIntStatus(ADC_BASE, ADC_ACCEL_SEQ_NUM, true))
+        {
+        }
+
+        samplesRead = ADCSequenceDataGet(ADC_BASE, ADC_ACCEL_SEQ_NUM, buffer);
+        assert(samplesRead >= 0 && samplesRead <= 4);
+    }
+    while (samplesRead != 3);
+    // The above do-while loop technically discards legitimate readings, but doesn't require us to implement a queue.
+    // It also assumes that whenever we get three samples, those samples are not offset with regards to which one is x, y, and z.
 
     AccelReading ret = { .x = buffer[0], .y = buffer[1], .z = buffer[2] };
     return ret;
@@ -269,19 +263,41 @@ int main(void)
     SYSCTL_XTAL_25MHZ | SYSCTL_OSC_MAIN | SYSCTL_USE_PLL | SYSCTL_CFG_VCO_480,
                        SYSTEM_CLOCK);
 
-    clearScreenAndMoveCursorHome();
-
     ADCSetup();
 
     while (true)
     {
+        clearScreenAndMoveCursorHome();
+
         JoystickReading reading = readJoystick();
-        char numberString[24] = { 0};
-        sprintf(numberString, "%d %d\r\n", reading.horizontal, reading.vertical);
+        char numberString[64] = { 0 };
+        sprintf(numberString, "joy: hor(%d) ver(%d)\r\n", reading.horizontal,
+                reading.vertical);
         uartPuts(numberString);
-        while (UARTBusy(UART0_BASE)) {
+        while (UARTBusy(UART0_BASE))
+        {
 
         }
+        SysCtlDelay(SysCtlClockGet() / 2);
+        AccelReading accelReading = readAccel();
+        sprintf(numberString, "accel: x(%d) y(%d) z(%d)\r\n", accelReading.x,
+                accelReading.y, accelReading.z);
+        uartPuts(numberString);
+        while (UARTBusy(UART0_BASE))
+        {
+
+        }
+        SysCtlDelay(SysCtlClockGet() / 2);
+        uint32_t micReading = readMicrophone();
+        sprintf(numberString, "mic: %d\r\n", micReading);
+        uartPuts(numberString);
+        while (UARTBusy(UART0_BASE))
+        {
+
+        }
+
+        SysCtlDelay(SysCtlClockGet() / 2);
+
     }
 }
 

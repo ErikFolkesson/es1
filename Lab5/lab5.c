@@ -34,6 +34,7 @@ typedef struct
     SemaphoreHandle_t rightButtonSemaphore; // The semaphore which signals the right button press.
 } ButtonHandlerArgs;
 
+// The task makes the LEDs blink.
 void vTaskBlink(void *pvParameters)
 {
     const TaskBlinkArgs *args = pvParameters;
@@ -43,8 +44,11 @@ void vTaskBlink(void *pvParameters)
     vTaskDelayUntil(&currentWakeTime,
                     pdMS_TO_TICKS(args->startOffsetSeconds * 1000));
 
+    // The tasks for the first two LEDs need to protect writing to their LED with a mutex to prevent data races with the 10-second tasks.
+    // The other two tasks don't have this kind of data race, and can just blink regularly.
     if (args->ledMutex == NULL)
     {
+        // This branch is for LEDs 3 and 4, which just need to blink.
         while (true)
         {
             // Turn on LED args.ledId
@@ -64,6 +68,7 @@ void vTaskBlink(void *pvParameters)
     }
     else
     {
+        // This branch is for LEDs 1 and 2, which need to use a mutex when modifying the LED.
         while (true)
         {
             // take mutex without blocking
@@ -95,6 +100,7 @@ void vTaskBlink(void *pvParameters)
     }
 }
 
+// This task turns on an LED for 10 seconds when a semaphore is released.
 void vTaskHold(void *pvParameters)
 {
     const TaskHoldArgs *args = pvParameters;
@@ -130,6 +136,7 @@ void vTaskHold(void *pvParameters)
     }
 }
 
+// This task handles button presses by releasing the semaphores that the corresponding 10-second task is waiting on.
 void buttonHandler(void *parameters)
 {
     const ButtonHandlerArgs *args = parameters;

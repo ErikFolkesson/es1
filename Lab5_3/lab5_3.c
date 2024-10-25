@@ -17,6 +17,7 @@
 #include "driverlib/uart.h"
 #include "inc/tm4c129encpdt.h"
 
+// How long it takes to simulate work being done by tasks.
 #define WAIT_ITERATIONS 10000000
 
 SemaphoreHandle_t g_printMutex;
@@ -60,6 +61,8 @@ typedef struct
     const char *name;
 } TaskArgs;
 
+// The function executed by the low and high priority tasks.
+// It takes a mutex, does some work, and then releases the mutex.
 void vTaskTakeMutex(void *pvParameters)
 {
     const TaskArgs *args = pvParameters;
@@ -70,12 +73,14 @@ void vTaskTakeMutex(void *pvParameters)
 
     while (true)
     {
+        // The writes to UART are protected with a mutex.
         xSemaphoreTake(g_printMutex, portMAX_DELAY);
         uartPuts("Task ");
         uartPuts(args->name);
         uartPuts(" started\r\n");
         xSemaphoreGive(g_printMutex);
 
+        // Take the mutex, from here until we release the mutex priority inversion is a risk.
         xSemaphoreTake(args->mutex, portMAX_DELAY);
 
         xSemaphoreTake(g_printMutex, portMAX_DELAY);
@@ -90,6 +95,7 @@ void vTaskTakeMutex(void *pvParameters)
         uartPuts(" started its workload\r\n");
         xSemaphoreGive(g_printMutex);
 
+        // Simulate some work being done.
         volatile int i = 0;
         while (i < WAIT_ITERATIONS)
         {
@@ -110,6 +116,7 @@ void vTaskTakeMutex(void *pvParameters)
         uartPuts(" finished\r\n");
         xSemaphoreGive(g_printMutex);
 
+        // Check if the task has missed its deadline for the period.
         TickType_t currentTimePoint = xTaskGetTickCount();
         TickType_t expectedTimePoint = startTimePoint
                 + pdMS_TO_TICKS(args->periodMs);
@@ -134,6 +141,7 @@ void vTaskTakeMutex(void *pvParameters)
     }
 }
 
+// The function for the medium priority task, which just performs some work without taking any mutex.
 void vTaskBusyWork(void *pvParameters)
 {
     const TaskArgs *args = pvParameters;
@@ -156,6 +164,7 @@ void vTaskBusyWork(void *pvParameters)
         uartPuts(" started its workload\r\n");
         xSemaphoreGive(g_printMutex);
 
+        // Simulate some work being done.
         volatile int i = 0;
         while (i < WAIT_ITERATIONS)
         {
@@ -168,6 +177,7 @@ void vTaskBusyWork(void *pvParameters)
         uartPuts(" finished\r\n");
         xSemaphoreGive(g_printMutex);
 
+        // Check if the task has missed its deadline for the period.
         TickType_t currentTimePoint = xTaskGetTickCount();
         TickType_t expectedTimePoint = startTimePoint
                 + pdMS_TO_TICKS(args->periodMs);
@@ -224,6 +234,7 @@ int main(void)
     const UBaseType_t highPrio = tskIDLE_PRIORITY + 3;
 
     // Construct task arguments as static variables to make sure they outlive the tasks.
+    // The release times are in the order of low -> high -> mid.
     static TaskArgs lowPriorityArgs;
     lowPriorityArgs = (TaskArgs ) { .mutex = mutex, .releaseTimeMs = 0,
                                     .periodMs = 4000, .name = "low" };

@@ -168,8 +168,8 @@ JoystickReading readJoystick()
         ADC_READ_VALUE_INTERRUPT = ADC_INT_SS2, // SS2 = sample sequence 2, can read up to 4 samples.
     };
 
-    int32_t samplesRead;
-    uint32_t buffer[4] = { 0 };
+    uint32_t buffer[64] = { 0 };
+    uint32_t bufSize = 0;
     do
     {
         ADCProcessorTrigger(ADC_BASE, ADC_JOY_SEQ_NUM);
@@ -180,10 +180,11 @@ JoystickReading readJoystick()
         {
         }
 
-        samplesRead = ADCSequenceDataGet(ADC_BASE, ADC_JOY_SEQ_NUM, buffer); // 0 lowest | 1450-1950 middle | 4000 higher
-        assert(samplesRead >= 0 && samplesRead <= 4);
+        int32_t samplesRead = ADCSequenceDataGet(ADC_BASE, ADC_JOY_SEQ_NUM, buffer); // 0 lowest | 1450-1950 middle | 4000 higher
+        assert(bufSize + samplesRead <= 64);
+        bufSize += samplesRead;
     }
-    while (samplesRead < 2);
+    while (bufSize % 2 == 0);
     // The above do-while loop technically discards legitimate readings, but doesn't require us to implement a queue.
     // It also assumes that whenever two sampler are read, the first is the horizontal value and the second is the vertical.
 
@@ -230,8 +231,8 @@ AccelReading readAccel()
     {
         ADC_READ_VALUE_INTERRUPT = ADC_INT_SS1, // SS1 = sample sequence 1, can read up to 4 samples.
     };
-    uint32_t buffer[4] = { 0 };
-    int32_t samplesRead;
+    uint32_t buffer[64] = { 0 };
+    uint32_t bufSize = 0;
     do
     {
         ADCProcessorTrigger(ADC_BASE, ADC_ACCEL_SEQ_NUM);
@@ -242,10 +243,11 @@ AccelReading readAccel()
         {
         }
 
-        samplesRead = ADCSequenceDataGet(ADC_BASE, ADC_ACCEL_SEQ_NUM, buffer);
-        assert(samplesRead >= 0 && samplesRead <= 4);
+        int32_t samplesRead = ADCSequenceDataGet(ADC_BASE, ADC_ACCEL_SEQ_NUM, buffer + bufSize);
+        assert(bufSize + samplesRead <= 64);
+        bufSize += samplesRead;
     }
-    while (samplesRead != 3);
+    while (bufSize % 3 != 0);
     // The above do-while loop technically discards legitimate readings, but doesn't require us to implement a queue.
     // It also assumes that whenever we get three samples, those samples are not offset with regards to which one is x, y, and z.
 
@@ -278,7 +280,6 @@ int main(void)
         {
 
         }
-        SysCtlDelay(SysCtlClockGet() / 2);
         AccelReading accelReading = readAccel();
         sprintf(numberString, "accel: x(%d) y(%d) z(%d)\r\n", accelReading.x,
                 accelReading.y, accelReading.z);
@@ -287,7 +288,6 @@ int main(void)
         {
 
         }
-        SysCtlDelay(SysCtlClockGet() / 2);
         uint32_t micReading = readMicrophone();
         sprintf(numberString, "mic: %d\r\n", micReading);
         uartPuts(numberString);

@@ -58,20 +58,11 @@ void clearScreenAndMoveCursorHome(void)
     uartPuts("\x1B[2J");
     uartPuts("\x1B[H");
 }
-
-// NOTE: We don't handle numbers larger than 99.
 void uartPrintInt(int number)
 {
-#if 1
     char numberBuf[64];
     sprintf(numberBuf, "%d", number);
     uartPuts(numberBuf);
-#else
-    char tenDigit = '0' + number / 10 % 10;
-    char oneDigit = '0' + number % 10;
-    UARTCharPut(UART0_BASE, tenDigit);
-    UARTCharPut(UART0_BASE, oneDigit);
-#endif
 }
 
 enum
@@ -174,9 +165,8 @@ JoystickReading readJoystick()
     {
         ADC_READ_VALUE_INTERRUPT = ADC_INT_SS2, // SS2 = sample sequence 2, can read up to 4 samples.
     };
-
-    int32_t samplesRead;
     uint32_t buffer[64] = { 0 };
+    uint32_t bufSize = 0;
     do
     {
         ADCProcessorTrigger(ADC_BASE, ADC_JOY_SEQ_NUM);
@@ -187,10 +177,12 @@ JoystickReading readJoystick()
         {
         }
 
-        samplesRead = ADCSequenceDataGet(ADC_BASE, ADC_JOY_SEQ_NUM, buffer); // 0 lowest | 1450-1950 middle | 4000 higher
-        assert(samplesRead <= 64);
+        int32_t samplesRead = ADCSequenceDataGet(ADC_BASE, ADC_JOY_SEQ_NUM,
+                                                 buffer); // 0 lowest | 1450-1950 middle | 4000 higher
+        assert(bufSize + samplesRead <= 64);
+        bufSize += samplesRead;
     }
-    while (samplesRead < 2);
+    while (bufSize % 2 == 0);
     // The above do-while loop technically discards legitimate readings, but doesn't require us to implement a queue.
     // It also assumes that whenever two sampler are read, the first is the horizontal value and the second is the vertical.
 
@@ -206,19 +198,24 @@ uint32_t readMicrophone()
         ADC_READ_VALUE_INTERRUPT = ADC_INT_SS3, // SS3 = sample sequence 3, can read a single sample.
     };
 
-    ADCProcessorTrigger(ADC_BASE, ADC_MIC_SEQ_NUM);
-
-    // Wait until the interrupt sampling the microphone value has completed.
-    while (ADC_READ_VALUE_INTERRUPT
-            & ADCIntStatus(ADC_BASE, ADC_MIC_SEQ_NUM, true))
-    {
-    }
-
     uint32_t buffer[64] = { 0 };
+    int32_t samplesRead;
 
-    int32_t samplesRead = ADCSequenceDataGet(ADC_BASE, ADC_MIC_SEQ_NUM,
-                                             buffer);
-    assert(samplesRead <= 64);
+    do
+    {
+
+        ADCProcessorTrigger(ADC_BASE, ADC_MIC_SEQ_NUM);
+
+        // Wait until the interrupt sampling the microphone value has completed.
+        while (ADC_READ_VALUE_INTERRUPT
+                & ADCIntStatus(ADC_BASE, ADC_MIC_SEQ_NUM, true))
+        {
+        }
+
+        samplesRead = ADCSequenceDataGet(ADC_BASE, ADC_MIC_SEQ_NUM, buffer);
+        assert(samplesRead <= 64);
+    }
+    while (samplesRead == 0);
 
     return buffer[0];
 }
@@ -238,8 +235,7 @@ AccelReading readAccel()
         ADC_READ_VALUE_INTERRUPT = ADC_INT_SS1, // SS1 = sample sequence 1, can read up to 4 samples.
     };
     uint32_t buffer[64] = { 0 };
-    int32_t samplesRead;
-    // FIXME: Add mutex around this part in all tasks.
+    int32_t bufSize;
     do
     {
         ADCProcessorTrigger(ADC_BASE, ADC_ACCEL_SEQ_NUM);
@@ -250,10 +246,12 @@ AccelReading readAccel()
         {
         }
 
-        samplesRead = ADCSequenceDataGet(ADC_BASE, ADC_ACCEL_SEQ_NUM, buffer);
-        assert(samplesRead <= 64);
+        int32_t samplesRead = ADCSequenceDataGet(ADC_BASE, ADC_ACCEL_SEQ_NUM,
+                                                 buffer);
+        assert(bufSize + samplesRead <= 64);
+        bufSize += samplesRead;
     }
-    while (samplesRead != 3);
+    while (bufSize % 3 != 0);
     // The above do-while loop technically discards legitimate readings, but doesn't require us to implement a queue.
     // It also assumes that whenever we get three samples, those samples are not offset with regards to which one is x, y, and z.
 
@@ -318,10 +316,15 @@ void micTask(void *parameters)
     while (true)
     {
         uint32_t reading = readMicrophone();
-        uint32_t db = 20 * log(reading);
 
-//        xQueueSend(args->readingQueue, &db, portMAX_DELAY);
-        xQueueSend(args->readingQueue, &reading, portMAX_DELAY);
+        // Attempt at converting to decibel, but we can't really find information about how do to it properly.
+        int32_t db = abs((int32_t) reading - 2050);
+
+        double relative = 20 * log10(db / 3. + 0.1);
+        db = 30 + relative;
+
+        assert(db);
+        xQueueSend(args->readingQueue, &db, portMAX_DELAY);
 
         vTaskDelayUntil(&startTimePoint, args->periodInTicks);
     }
@@ -357,13 +360,13 @@ void gatekeepTask(void *parameters)
         xQueueReceive(args->joyQueue, &joyReading, portMAX_DELAY);
         AccelReading accelReading;
         xQueueReceive(args->accelQueue, &accelReading, portMAX_DELAY);
-        uint32_t micReading;
+        int32_t micReading;
         xQueueReceive(args->micQueue, &micReading, portMAX_DELAY);
 
         clearScreenAndMoveCursorHome();
         uartPuts("Joy: hor(");
         uartPrintInt(joyReading.horizontal);
-        uartPuts(") ver(");;
+        uartPuts(") ver(");
         uartPrintInt(joyReading.vertical);
         uartPuts(")\r\n");
 
@@ -400,7 +403,7 @@ int main(void)
     accelerometerQueue = xQueueCreate(2, sizeof(AccelReading));
     assert(accelerometerQueue);
     static QueueHandle_t microphoneQueue;
-    microphoneQueue = xQueueCreate(8, sizeof(uint32_t));
+    microphoneQueue = xQueueCreate(8, sizeof(int32_t));
     assert(microphoneQueue);
     static QueueHandle_t joyQueue;
     joyQueue = xQueueCreate(4, sizeof(JoystickReading));

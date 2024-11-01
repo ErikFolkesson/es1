@@ -85,6 +85,7 @@ void printUartData(void)
     clearScreenAndMoveCursorHome();
     uartPuts(buf);
 
+    // Poll the status semaphore to see if we should print the status line.
     if (xSemaphoreTake(g_statusSemaphore, 0))
     {
         xSemaphoreGive(g_statusSemaphore);
@@ -96,7 +97,7 @@ void printUartData(void)
 // Rotates the element in the buffer one step to the left, with the first character moving to the last position.
 void rotateLeft(char *buf, int bufSize)
 {
-    char tmp = *buf;
+    char tmp = buf[0];
     for (int i = 1; i < bufSize; i++)
     {
         buf[i - 1] = buf[i];

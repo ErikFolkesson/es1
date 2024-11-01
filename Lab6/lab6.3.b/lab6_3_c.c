@@ -183,7 +183,7 @@ JoystickReading readJoystick()
         assert(bufSize + samplesRead <= 64);
         bufSize += samplesRead;
     }
-    while (bufSize % 2 == 0);
+    while (bufSize % 2 != 0);
     // The above do-while loop technically might discard legitimate readings.
     // It also assumes that we will read a multiple of 2 samples before filling the buffer.
 
@@ -408,7 +408,7 @@ void gatekeepTask(void *parameters)
 
         uartPuts("Mic: ");
         uartPrintInt(micAverage);
-        uartPuts("\r\n");
+        uartPuts("dB\r\n");
 
         vTaskDelayUntil(&startTimePoint, args->periodInTicks);
     }

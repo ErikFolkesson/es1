@@ -184,7 +184,7 @@ JoystickReading readJoystick()
         assert(bufSize + samplesRead <= 64);
         bufSize += samplesRead;
     }
-    while (bufSize % 2 == 0);
+    while (bufSize % 2 != 0);
     // The above do-while loop technically discards legitimate readings, but doesn't require us to implement a queue.
     // It also assumes that whenever two sampler are read, the first is the horizontal value and the second is the vertical.
 

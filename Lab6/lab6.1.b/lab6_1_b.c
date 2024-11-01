@@ -17,8 +17,6 @@
 #include "driverlib/uart.h"
 #include "inc/tm4c129encpdt.h"
 
-#define WAIT_ITERATIONS 10000000
-
 SemaphoreHandle_t g_printMutex;
 
 void ConfigureUART(void)
@@ -69,19 +67,21 @@ typedef struct
     Buffer *buffer;
 } Args;
 
+uint16_t byteIndex;
 uint8_t produceByte(void)
 {
-    return '|';
+    return byteIndex++ % 10 + '0';
 }
 
 void putByteIntoBuffer(Buffer *buffer, uint8_t byte)
 {
-    assert(buffer->size <= buffer->capacity);
+    assert(buffer->size < buffer->capacity);
     buffer->data[buffer->size] = byte;
 }
 
 uint8_t removeByteFromBuffer(Buffer *buffer)
 {
+    assert(buffer->size <= buffer->capacity);
     return buffer->data[buffer->size - 1];
 }
 
@@ -156,9 +156,14 @@ void consumer(void *parameters)
         uint8_t byte = removeByteFromBuffer(args->buffer);
 
         uint16_t oldSize = args->buffer->size;
+        // To catch potential problems with this producer/consumer implementation, we explicitly yield before modifying the size,
+        // allowing a context switch in a critical region.
         taskYIELD();
         uint16_t newSize = args->buffer->size;
-        assert(oldSize == newSize); // Check if the yield caused a context switch which modified the buffer.
+        uint8_t newByte = removeByteFromBuffer(args->buffer);
+        // Check if the read byte or size was modified during the context switch.
+        assert(byte == newByte);
+        assert(oldSize == newSize);
 
         args->buffer->size = oldSize - 1;
         assert(args->buffer->size <= args->buffer->capacity);
@@ -200,17 +205,15 @@ int main(void)
 
     enum
     {
-        BUFFER_CAPACITY = 100
+        BUFFER_CAPACITY = 5
     };
-    uint8_t bufferData[BUFFER_CAPACITY] = { 0 };
+    static uint8_t bufferData[BUFFER_CAPACITY] = { 0 };
     static Buffer buffer;
     buffer = (Buffer ) { .data = bufferData, .capacity = BUFFER_CAPACITY };
     static SemaphoreHandle_t emptySlots;
-    emptySlots = xSemaphoreCreateCounting(
-            BUFFER_CAPACITY, BUFFER_CAPACITY);
+    emptySlots = xSemaphoreCreateCounting(BUFFER_CAPACITY, BUFFER_CAPACITY);
     static SemaphoreHandle_t filledSlots;
-    filledSlots = xSemaphoreCreateCounting(
-            BUFFER_CAPACITY, 0);
+    filledSlots = xSemaphoreCreateCounting(BUFFER_CAPACITY, 0);
     static SemaphoreHandle_t bufferMutex;
     bufferMutex = xSemaphoreCreateMutex();
 

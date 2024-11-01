@@ -17,8 +17,6 @@
 #include "driverlib/uart.h"
 #include "inc/tm4c129encpdt.h"
 
-#define WAIT_ITERATIONS 10000000
-
 SemaphoreHandle_t g_printMutex;
 
 void ConfigureUART(void)
@@ -75,22 +73,25 @@ typedef struct
     Buffer *buffer;
 } ConsumerArgs;
 
+uint16_t byteIndex;
 uint8_t produceByte(void)
 {
-    return '|';
+    return byteIndex++ % 10 + '0';
 }
 
 void putByteIntoBuffer(Buffer *buffer, uint8_t byte)
 {
-    assert(buffer->size <= buffer->capacity);
+    assert(buffer->size < buffer->capacity);
     buffer->data[buffer->size] = byte;
 }
 
 uint8_t removeByteFromBuffer(Buffer *buffer)
 {
+    assert(buffer->size <= buffer->capacity);
     return buffer->data[buffer->size - 1];
 }
 
+// Sleeps the task until another task wakes it up.
 void sleep(bool *wakeupCall)
 {
     *wakeupCall = false;
@@ -100,6 +101,7 @@ void sleep(bool *wakeupCall)
     }
 }
 
+// Wakes up the task waiting on the bool passed as a pointer.
 void wakeup(bool *wakeupCall)
 {
     *wakeupCall = true;
@@ -150,7 +152,6 @@ void consumer(void *parameters)
         uartPuts("Consumer at start of while!\r\n");
         if (args->buffer->size == 0)
         {
-
             uartPuts("Consumer going to sleep!\r\n");
 
             sleep(args->consumerRunnable);
@@ -162,16 +163,20 @@ void consumer(void *parameters)
         uint8_t byte = removeByteFromBuffer(args->buffer);
 
         uint16_t oldSize = args->buffer->size;
+        // To catch potential problems with this producer/consumer implementation, we explicitly yield before modifying the size,
+        // allowing a context switch in a critical region.
         taskYIELD();
         uint16_t newSize = args->buffer->size;
-        assert(oldSize == newSize); // Check if the size was modified while yielding.
+        uint8_t newByte = removeByteFromBuffer(args->buffer);
+        // Check if the read byte or size was modified during the context switch.
+        assert(byte == newByte);
+        assert(oldSize == newSize);
 
         args->buffer->size = oldSize - 1;
 
         assert(args->buffer->size <= args->buffer->capacity);
         if (args->buffer->size == args->buffer->capacity - 1)
         {
-
             uartPuts("Consumer waking up producer!\r\n");
 
             wakeup(args->producerRunnable);
@@ -203,7 +208,6 @@ int main(void)
 
     uartPuts("\r\nStarting new run\r\n");
 
-
     const uint16_t taskStackDepth = 1000;
     const UBaseType_t priority = tskIDLE_PRIORITY + 1;
 
@@ -211,7 +215,7 @@ int main(void)
     {
         BUFFER_CAPACITY = 100
     };
-    uint8_t bufferData[BUFFER_CAPACITY] = { 0 };
+    static uint8_t bufferData[BUFFER_CAPACITY] = { 0 };
     static Buffer buffer;
     buffer = (Buffer ) { .data = bufferData, .capacity = BUFFER_CAPACITY };
     static bool consumerRunnable = false;
